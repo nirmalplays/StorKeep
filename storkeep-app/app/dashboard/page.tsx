@@ -1,7 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { X402LogPanel } from '@/components/X402LogPanel'
-import { connectBaseSepoliaWallet, getWalletClient } from '@/lib/wallet'
 
 const REGISTRY_CONTRACT = '0x7CC100a2c115e5B02F7BbaC7616D290A17D89397'
 const VAULT_WALLET = '0x4e51EA274b9a6192B2BBB7734b6bE50bC7B4752B'
@@ -40,8 +39,6 @@ export default function DashboardPage() {
   const [logActive, setLogActive] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [walletAddress, setWalletAddress] = useState<string | null>(null)
-  const [walletBalance, setWalletBalance] = useState<string | null>(null)
   const [vaultBalance, setVaultBalance] = useState<string | null>(null)
   const [autoRunning, setAutoRunning] = useState(false)
   const [expiryTx, setExpiryTx] = useState<string | null>(null)
@@ -54,15 +51,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     // Always fetch vault wallet balance (the one that pays gas)
-    fetchBalance(VAULT_WALLET, true)
-
-    // Also get connected MetaMask wallet
-    getWalletClient().then((w: any) => {
-      if (w) {
-        setWalletAddress(w.account.address)
-        fetchBalance(w.account.address, false)
-      }
-    })
+    fetchBalance(VAULT_WALLET)
   }, [])
 
   // Load persisted counters for demo so they survive reloads during judging
@@ -87,7 +76,7 @@ export default function DashboardPage() {
     window.localStorage.setItem('storkeep_autopilotCount', String(autopilotCount))
   }, [autopilotCount, countsLoaded])
 
-  async function fetchBalance(address: string, isVault: boolean) {
+  async function fetchBalance(address: string) {
     try {
       const res = await fetch('https://api.calibration.node.glif.io/rpc/v1', {
         method: 'POST',
@@ -101,12 +90,10 @@ export default function DashboardPage() {
       const data = await res.json()
       if (data.result) {
         const bal = (parseInt(data.result, 16) / 1e18).toFixed(4) + ' tFIL'
-        if (isVault) setVaultBalance(bal)
-        else setWalletBalance(bal)
+        setVaultBalance(bal)
       }
     } catch {
-      if (isVault) setVaultBalance('—')
-      else setWalletBalance('—')
+      setVaultBalance('—')
     }
   }
 
@@ -117,16 +104,6 @@ export default function DashboardPage() {
       if (autoCountdownRef.current) clearInterval(autoCountdownRef.current)
     }
   }, [])
-
-  async function connectWallet() {
-    try {
-      const w = await connectBaseSepoliaWallet()
-      setWalletAddress(w.account.address)
-      fetchBalance(w.account.address, false)
-    } catch (e: any) {
-      setError(e.message)
-    }
-  }
 
   async function checkDeal() {
     if (!dealId) return
@@ -161,7 +138,7 @@ export default function DashboardPage() {
       setRenewalHistory(prev => [data, ...prev].slice(0, 10))
       setDealsRenewedCount(c => c + 1)
       // Refresh vault balance after renewal
-      fetchBalance(VAULT_WALLET, true)
+      fetchBalance(VAULT_WALLET)
       return data
     } catch (e: any) {
       setError(e.message)
@@ -182,7 +159,7 @@ export default function DashboardPage() {
       setRenewed(data)
       setRenewalHistory(prev => [data, ...prev].slice(0, 10))
       setDealsRenewedCount(c => c + 1)
-      fetchBalance(VAULT_WALLET, true)
+      fetchBalance(VAULT_WALLET)
     } catch (e: any) {
       setError(e.message)
     } finally {
@@ -333,7 +310,7 @@ export default function DashboardPage() {
             <h1 style={{ color: '#00ff88', fontSize: 22, margin: 0 }}>StorKeep</h1>
             <div style={{ color: '#444', fontSize: 12 }}>Filecoin deal manager · Calibration testnet</div>
           </div>
-          <div style={{ textAlign: 'right' }}>
+          <div style={{ textAlign: 'right', minWidth: 180 }}>
             {/* Vault wallet — always shown */}
             <div style={{ marginBottom: 6 }}>
               <div style={{ fontSize: 10, color: '#333', textTransform: 'uppercase', letterSpacing: 1 }}>Vault Wallet</div>
@@ -344,14 +321,6 @@ export default function DashboardPage() {
                 {vaultBalance ?? 'fetching...'}
               </div>
             </div>
-            {/* Connected wallet */}
-            {walletAddress ? (
-              <div>
-                <div style={{ fontSize: 10, color: '#333', textTransform: 'uppercase', letterSpacing: 1 }}>Connected</div>
-                <div style={{ fontSize: 11, color: '#4488ff' }}>{walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}</div>
-                {walletBalance && <div style={{ fontSize: 11, color: '#555' }}>{walletBalance}</div>}
-              </div>
-            ) : outlineBtn('Connect Wallet', connectWallet, '#888')}
           </div>
         </div>
 
