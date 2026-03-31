@@ -15,6 +15,12 @@ export function SiteNav() {
             Dev Docs
           </Link>
           <Link
+            href="/dev-docs/sdk-quickstart"
+            className="text-gray-400 hover:text-green-400 transition-colors"
+          >
+            Quickstart
+          </Link>
+          <Link
             href="/dashboard"
             className="text-gray-400 hover:text-green-400 transition-colors"
           >

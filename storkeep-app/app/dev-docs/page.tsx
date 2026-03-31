@@ -65,6 +65,7 @@ export default function DevDocsPage() {
         <div className="mt-6 border border-gray-800 bg-gray-950/40 p-4">
           <div className="text-xs text-gray-500 mb-3 uppercase tracking-widest">Navigation</div>
           <div className="flex flex-wrap gap-2 text-sm">
+            <a href="/dev-docs/sdk-quickstart" className="px-2 py-1 border border-green-500/30 text-green-400 hover:border-green-400">SDK Quickstart →</a>
             <a href="#getting-started" className="px-2 py-1 border border-gray-700 text-gray-300 hover:text-green-400 hover:border-green-500/40">Getting Started</a>
             <a href="#using-sdk" className="px-2 py-1 border border-gray-700 text-gray-300 hover:text-green-400 hover:border-green-500/40">Using the SDK</a>
             <a href="#tailwind-workflow" className="px-2 py-1 border border-gray-700 text-gray-300 hover:text-green-400 hover:border-green-500/40">Tailwind Workflow</a>
