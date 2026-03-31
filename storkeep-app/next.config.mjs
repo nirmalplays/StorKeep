@@ -1,6 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ['@base-org/account'],
+  webpack: (config) => {
+    config.ignoreWarnings = config.ignoreWarnings ?? []
+    config.ignoreWarnings.push({
+      module: /storkeep-sdk[\\/]dist[\\/]index\.mjs/,
+      message: /Critical dependency: the request of a dependency is an expression/,
+    })
+    return config
+  },
   async redirects() {
     return [
       { source: '/agentvault', destination: '/economy', permanent: true },
