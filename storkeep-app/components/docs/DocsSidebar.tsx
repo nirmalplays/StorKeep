@@ -19,7 +19,7 @@ function itemClass(active: boolean): string {
 }
 
 export function DocsSidebar({ onNavigate }: Props) {
-  const pathname = usePathname()
+  const pathname = usePathname() ?? ''
   const is = (path: string) => pathname === path
   const wrap = () => onNavigate?.()
 

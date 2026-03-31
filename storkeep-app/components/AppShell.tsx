@@ -5,7 +5,7 @@ import { AppSideNav } from '@/components/AppSideNav'
 import { SiteNav } from '@/components/SiteNav'
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname()
+  const pathname = usePathname() ?? ''
   if (pathname.startsWith('/dev-docs')) {
     return <>{children}</>
   }

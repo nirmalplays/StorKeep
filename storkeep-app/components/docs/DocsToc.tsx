@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { devDocsToc, quickstartToc } from '@/lib/docs-nav'
 
 export function DocsToc() {
-  const pathname = usePathname()
+  const pathname = usePathname() ?? ''
   const items = useMemo(
     () => (pathname === '/dev-docs/sdk-quickstart' ? quickstartToc : devDocsToc),
     [pathname],

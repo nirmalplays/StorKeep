@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "vercel:prod": "cd .. && npx vercel --prod"
   },
   "dependencies": {
     "@base-org/account": "^2.5.3",

@@ -1,18 +1,9 @@
 import Link from 'next/link'
 import { HomeStats } from '@/components/HomeStats'
-
-async function getStats() {
-  try {
-    const base = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
-    const res = await fetch(`${base}/api/stats`, { next: { revalidate: 60 } })
-    return res.ok ? res.json() : { totalRenewals: 0, activeAutopilots: 0 }
-  } catch {
-    return { totalRenewals: 0, activeAutopilots: 0 }
-  }
-}
+import { getHomeStats } from '@/lib/stats-public'
 
 export default async function Home() {
-  const stats = await getStats()
+  const stats = await getHomeStats()
 
   return (
     <main className="min-h-screen bg-black text-white font-mono">

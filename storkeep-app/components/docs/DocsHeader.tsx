@@ -18,7 +18,7 @@ function pill(active: boolean): string {
 }
 
 export function DocsHeader({ onOpenSidebar }: Props) {
-  const pathname = usePathname()
+  const pathname = usePathname() ?? ''
   const isGuide = pathname === '/dev-docs'
   const isQuickstart = pathname === '/dev-docs/sdk-quickstart'
 

@@ -26,7 +26,7 @@ function navLinkClass(active: boolean, emphasis = false): string {
 }
 
 export function AppSideNav() {
-  const pathname = usePathname()
+  const pathname = usePathname() ?? ''
   const is = (path: string) => pathname === path
 
   return (
