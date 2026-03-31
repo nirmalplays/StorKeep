@@ -1,18 +1,10 @@
-import { StorKeep } from 'storkeep-sdk'
 import { agentStore, type Agent } from '@/lib/agent-state'
 import { emitAgentEvent } from '@/lib/event-bus'
 import { getAgentFilecoinPrivateKey } from '@/lib/agent-wallet'
+import { getDealFromChain } from '@/lib/filecoin'
+import { performRenewal } from '@/lib/renew'
 
-const BASESCAN = 'https://sepolia.basescan.org/tx'
 const FILFOX   = 'https://calibration.filfox.info/en/tx'
-
-function getStorKeep(pk: `0x${string}`) {
-  return new StorKeep({
-    x402Wallet: { privateKey: pk },
-    network: 'calibration',
-    storkeepApiUrl: process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000',
-  })
-}
 
 export function runGuardian(agent: Agent, cycleMs: number, stopped: () => boolean): () => void {
   async function cycle() {
@@ -21,8 +13,6 @@ export function runGuardian(agent: Agent, cycleMs: number, stopped: () => boolea
       console.error('[guardian] Set FILECOIN_WALLET_PRIVATE_KEY')
       return
     }
-
-    const sk = getStorKeep(pk)
 
     while (!stopped()) {
       await sleep(cycleMs + jitter(5000))
@@ -42,11 +32,17 @@ export function runGuardian(agent: Agent, cycleMs: number, stopped: () => boolea
 
       for (const { cid, dealId } of deals) {
         try {
-          const status = await sk.getDealStatus(dealId)
+          const status = await getDealFromChain(dealId)
 
           // Update listing status
           const listing = agentStore.listings.get(cid)
-          if (listing) agentStore.listings.set(cid, { ...listing, status: status.status })
+          if (listing) {
+            const listingStatus =
+              status.status === 'active' || status.status === 'expiring' || status.status === 'expired'
+                ? status.status
+                : undefined
+            agentStore.listings.set(cid, { ...listing, status: listingStatus })
+          }
 
           console.log(`[${a.id}] Deal ${dealId}: ${status.status}, ~${Math.round(status.daysUntilExpiry)}d left`)
 
@@ -54,7 +50,7 @@ export function runGuardian(agent: Agent, cycleMs: number, stopped: () => boolea
             console.log(`[${a.id}] Renewing deal ${dealId} via StorKeep x402…`)
 
             try {
-              const result = await sk.renewDeal(dealId, { maxPriceUsdc: 1.0 })
+              const result = await performRenewal(dealId, process.env.STORKEEP_WALLET_ADDRESS ?? a.id)
               const cost = parseFloat(result.actualCostUsdc)
 
               agentStore.addTransaction({
@@ -70,7 +66,6 @@ export function runGuardian(agent: Agent, cycleMs: number, stopped: () => boolea
               a.budget -= cost
 
               console.log(`[${a.id}] Renewed deal ${dealId} — $${result.actualCostUsdc} USDC`)
-              if (result.paymentTxHash) console.log(`  BaseScan: ${BASESCAN}/${result.paymentTxHash}`)
               if (result.txHash)        console.log(`  Filfox:   ${FILFOX}/${result.txHash}`)
 
               await emitAgentEvent('agent:renew', {
@@ -78,9 +73,9 @@ export function runGuardian(agent: Agent, cycleMs: number, stopped: () => boolea
                 dealId,
                 cid,
                 costUsdc:       result.actualCostUsdc,
-                paymentTxHash:  result.paymentTxHash ?? null,
+                paymentTxHash:  null,
                 filecoinTxHash: result.txHash ?? null,
-                basescanUrl:    result.paymentTxHash ? `${BASESCAN}/${result.paymentTxHash}` : null,
+                basescanUrl:    null,
                 filfoxUrl:      result.txHash ? `${FILFOX}/${result.txHash}` : null,
               })
 
