@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
-import { SiteNav } from "@/components/SiteNav";
+import { Suspense } from "react";
+import { AppShell } from "@/components/AppShell";
 import "./globals.css";
 
 const geistSans = localFont({
@@ -30,8 +31,9 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <SiteNav />
-        {children}
+        <Suspense fallback={<div className="min-h-screen bg-zinc-950" />}>
+          <AppShell>{children}</AppShell>
+        </Suspense>
       </body>
     </html>
   );
