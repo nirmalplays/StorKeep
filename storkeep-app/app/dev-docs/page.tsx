@@ -2,14 +2,20 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
   title: 'Dev Docs · StorKeep',
-  description: 'Developer setup and runbook for StorKeep and Agent Vault.',
+  description: 'Complete setup, Tailwind install flow, and runbook for StorKeep.',
 }
 
 const envRows = [
-  { key: 'FILECOIN_WALLET_PRIVATE_KEY', required: 'yes', where: 'Guardian renew flow', note: 'Calibration wallet key used for renewals.' },
-  { key: 'STORKEEP_WALLET_ADDRESS', required: 'recommended', where: 'x402 paid renew route', note: 'Set to enable paid renew path cleanly.' },
-  { key: 'LIGHTHOUSE_RAAS_CONTRACT', required: 'optional', where: 'Renew integration', note: 'Defaults are already present for demo.' },
-  { key: 'NEXT_PUBLIC_APP_URL', required: 'recommended', where: 'Local event bridge', note: 'Use http://localhost:3000 in local dev.' },
+  { key: 'FILECOIN_WALLET_PRIVATE_KEY', required: 'yes', where: 'Renew/Autopilot signing', note: 'Must be 0x + 64 hex chars.' },
+  { key: 'STORKEEP_WALLET_ADDRESS', required: 'yes', where: 'Payment wallet identity', note: 'Public 0x address (42 chars).' },
+  { key: 'FILECOIN_RPC_URL', required: 'yes', where: 'Chain read/write', note: 'Calibration: https://api.calibration.node.glif.io/rpc/v1' },
+  { key: 'NEXT_PUBLIC_APP_URL', required: 'yes', where: 'App API calls in prod', note: 'Set to your Vercel domain.' },
+  { key: 'APP_URL', required: 'recommended', where: 'Server-side URL fallback', note: 'Usually same value as NEXT_PUBLIC_APP_URL.' },
+  { key: 'LIGHTHOUSE_RAAS_CONTRACT', required: 'recommended', where: 'RaaS renew calls', note: 'Use calibrated contract address.' },
+  { key: 'STORKEEP_REGISTRY_CONTRACT', required: 'optional', where: 'On-chain registry writes', note: 'If unset, registry write is skipped.' },
+  { key: 'CRON_SECRET', required: 'recommended', where: '/api/cron protection', note: 'Use a long random secret.' },
+  { key: 'POSTGRES_PRISMA_URL', required: 'optional', where: 'DB-backed features', note: 'Needed when enabling database persistence.' },
+  { key: 'POSTGRES_URL_NON_POOLING', required: 'optional', where: 'Prisma migrations/runtime', note: 'Companion URL for Prisma on Vercel.' },
 ]
 
 const apiRows = [
@@ -20,37 +26,92 @@ const apiRows = [
   { route: 'GET /api/events', purpose: 'SSE event stream used by Agent Vault TX feed.' },
 ]
 
+const installSteps = [
+  {
+    id: '01',
+    title: 'Clone and enter app directory',
+    body: 'Work from the monorepo root, then move into the Next.js app folder.',
+    cmd: `git clone https://github.com/nirmalplays/StorKeep.git
+cd StorKeep/storkeep-app`,
+  },
+  {
+    id: '02',
+    title: 'Install dependencies',
+    body: 'Install app dependencies and linked workspace packages.',
+    cmd: `npm install`,
+  },
+  {
+    id: '03',
+    title: 'Configure environment variables',
+    body: 'Create your env from template and fill values before running chain actions.',
+    cmd: `cp .env.example .env.local`,
+  },
+  {
+    id: '04',
+    title: 'Run development server',
+    body: 'Start local app and open dashboard/economy routes.',
+    cmd: `npm run dev`,
+  },
+]
+
 export default function DevDocsPage() {
   return (
     <main className="min-h-screen bg-black text-white font-mono">
       <section className="max-w-5xl mx-auto px-6 pt-14 pb-8">
         <h1 className="text-4xl font-bold text-green-400 mb-4">StorKeep Dev Docs</h1>
         <p className="text-gray-400 max-w-3xl">
-          Instructions page for local setup, demo flow, and key API routes.
-          Use this as the runbook before hackathon presentations.
+          Full install and usage guide: setup, Tailwind workflow, environment config, deploy, and operations.
+          This page is intentionally structured as a step-by-step reference.
         </p>
       </section>
 
       <section className="max-w-5xl mx-auto px-6 py-6">
-        <h2 className="text-xl font-bold mb-3">Quick Start</h2>
-        <pre className="bg-gray-950 border border-gray-800 p-5 text-sm text-gray-300 overflow-x-auto">{`cd storkeep-app
-npm install
-npm run dev`}</pre>
+        <h2 className="text-xl font-bold mb-4">1) Getting Started</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {installSteps.map((s) => (
+            <article key={s.id} className="border border-gray-800 bg-gray-950/40 p-4">
+              <div className="text-green-400 text-xs mb-2">STEP {s.id}</div>
+              <h3 className="font-bold mb-2">{s.title}</h3>
+              <p className="text-gray-400 text-sm mb-3">{s.body}</p>
+              <pre className="bg-black border border-gray-800 p-3 text-xs text-gray-300 overflow-x-auto">{s.cmd}</pre>
+            </article>
+          ))}
+        </div>
+        <p className="text-gray-500 text-sm mt-4">
+          Default local URL: <span className="text-green-400">http://localhost:3000</span>
+        </p>
       </section>
 
       <section className="max-w-5xl mx-auto px-6 py-6">
-        <h2 className="text-xl font-bold mb-3">Demo Runbook</h2>
-        <ol className="list-decimal list-inside space-y-2 text-gray-300">
-          <li>Open <span className="text-green-400">/dashboard</span> and connect wallet.</li>
-          <li>Check a deal ID, then run one renewal (demo or paid path).</li>
-          <li>Enable autopilot once to confirm the flow and counter updates.</li>
-          <li>Open <span className="text-green-400">/economy</span> and click Start (2 min) for Agent Vault live feed.</li>
-          <li>Return to home page to confirm counters are updated.</li>
-        </ol>
+        <h2 className="text-xl font-bold mb-3">2) Tailwind Workflow</h2>
+        <div className="space-y-3 text-gray-300 text-sm">
+          <p><span className="text-green-400">Step 1:</span> Ensure Tailwind is installed in dependencies.</p>
+          <pre className="bg-gray-950 border border-gray-800 p-4 overflow-x-auto">{`npm install tailwindcss postcss`}</pre>
+          <p><span className="text-green-400">Step 2:</span> Keep Tailwind directives in global CSS (already present in this repo).</p>
+          <pre className="bg-gray-950 border border-gray-800 p-4 overflow-x-auto">{`@tailwind base;
+@tailwind components;
+@tailwind utilities;`}</pre>
+          <p><span className="text-green-400">Step 3:</span> Use utility classes in components/pages.</p>
+          <pre className="bg-gray-950 border border-gray-800 p-4 overflow-x-auto">{`<h1 className="text-3xl font-bold text-green-400">StorKeep</h1>`}</pre>
+          <p><span className="text-green-400">Step 4:</span> Run local dev and production build checks.</p>
+          <pre className="bg-gray-950 border border-gray-800 p-4 overflow-x-auto">{`npm run dev
+npm run build`}</pre>
+          <p className="text-gray-400">
+            Official Tailwind installation reference: {' '}
+            <a
+              className="text-green-400 underline"
+              href="https://tailwindcss.com/docs/installation/using-vite"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Installing Tailwind with Vite
+            </a>
+          </p>
+        </div>
       </section>
 
       <section className="max-w-5xl mx-auto px-6 py-6">
-        <h2 className="text-xl font-bold mb-3">Environment Variables</h2>
+        <h2 className="text-xl font-bold mb-3">3) Environment Variables</h2>
         <div className="overflow-x-auto border border-gray-800">
           <table className="w-full text-sm">
             <thead className="bg-gray-950">
@@ -75,8 +136,31 @@ npm run dev`}</pre>
         </div>
       </section>
 
+      <section className="max-w-5xl mx-auto px-6 py-6">
+        <h2 className="text-xl font-bold mb-3">4) Demo Runbook</h2>
+        <ol className="list-decimal list-inside space-y-2 text-gray-300">
+          <li>Open <span className="text-green-400">/dashboard</span>.</li>
+          <li>Check a deal ID, then run one renewal (demo or paid path).</li>
+          <li>Enable autopilot once to confirm the flow and counter updates.</li>
+          <li>Open <span className="text-green-400">/economy</span> and click Start (2 min) for Agent Vault live feed.</li>
+          <li>Return to home page to confirm counters are updated.</li>
+        </ol>
+      </section>
+
+      <section className="max-w-5xl mx-auto px-6 py-6">
+        <h2 className="text-xl font-bold mb-3">5) Build and Deploy</h2>
+        <pre className="bg-gray-950 border border-gray-800 p-5 text-sm text-gray-300 overflow-x-auto">{`# local production check
+npm run build
+
+# deploy using connected Vercel project
+vercel --prod`}</pre>
+        <p className="text-gray-400 text-sm mt-3">
+          Vercel project settings: Root Directory must be <span className="text-green-400">storkeep-app</span>.
+        </p>
+      </section>
+
       <section className="max-w-5xl mx-auto px-6 py-6 pb-16">
-        <h2 className="text-xl font-bold mb-3">Core API Routes</h2>
+        <h2 className="text-xl font-bold mb-3">6) Core API Routes</h2>
         <div className="border border-gray-800 divide-y divide-gray-800">
           {apiRows.map((row) => (
             <div key={row.route} className="p-4">
@@ -84,6 +168,39 @@ npm run dev`}</pre>
               <div className="text-gray-400 text-sm mt-1">{row.purpose}</div>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section className="max-w-5xl mx-auto px-6 py-6 pb-20">
+        <h2 className="text-xl font-bold mb-3">7) Troubleshooting + FAQ</h2>
+        <div className="space-y-3">
+          <div className="border border-gray-800 p-4">
+            <div className="text-green-400 mb-1">Build error: Cannot resolve storkeep-sdk</div>
+            <p className="text-gray-400 text-sm">
+              Ensure app root is <span className="text-green-400">storkeep-app</span> in Vercel and latest commit is deployed.
+              This repo is patched to avoid guardian runtime dependency issues.
+            </p>
+          </div>
+          <div className="border border-gray-800 p-4">
+            <div className="text-green-400 mb-1">Runtime error: invalid private key</div>
+            <p className="text-gray-400 text-sm">
+              `FILECOIN_WALLET_PRIVATE_KEY` must be exactly <span className="text-green-400">0x + 64 hex chars</span>, no quotes/newlines.
+            </p>
+          </div>
+          <div className="border border-gray-800 p-4">
+            <div className="text-green-400 mb-1">Counters reset unexpectedly</div>
+            <p className="text-gray-400 text-sm">
+              Dashboard and home counters use browser localStorage keys:
+              <span className="text-green-400"> storkeep_dealsRenewed </span> and
+              <span className="text-green-400"> storkeep_autopilotCount</span>.
+            </p>
+          </div>
+          <div className="border border-gray-800 p-4">
+            <div className="text-green-400 mb-1">Do I need Connect Wallet?</div>
+            <p className="text-gray-400 text-sm">
+              Current flow is server-wallet driven for renewals/autopilot; user wallet connect is intentionally removed from dashboard.
+            </p>
+          </div>
         </div>
       </section>
     </main>
