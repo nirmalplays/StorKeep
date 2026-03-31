@@ -3,7 +3,6 @@
 > Autonomous Filecoin deal manager — your data never expires again.
 
 [![Live App](https://img.shields.io/badge/Live%20App-stor--keep.vercel.app-00ff88?style=flat-square)](https://stor-keep.vercel.app)
-[![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 [![npm](https://img.shields.io/badge/npm-storkeep--sdk-red?style=flat-square)](https://www.npmjs.com/package/storkeep-sdk)
 [![Hackathon](https://img.shields.io/badge/PL%20Genesis-Hackathon-purple?style=flat-square)](https://pl-genesis-frontiers-of-collaboration-hackathon.devspot.app)
 
