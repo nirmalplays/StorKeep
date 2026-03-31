@@ -25,7 +25,6 @@ export function runConsumer(agent: Agent, cycleMs: number, stopped: () => boolea
       const listings = Array.from(agentStore.listings.entries()).map(([cid, l]) => ({ cid, ...l }))
 
       if (listings.length > 0) {
-        // Pick cheapest listing
         const target = listings.sort((x, y) =>
           parseFloat(x.pricePerRetrieve) - parseFloat(y.pricePerRetrieve)
         )[0]
@@ -36,7 +35,6 @@ export function runConsumer(agent: Agent, cycleMs: number, stopped: () => boolea
           a.budget -= cost
           a.txCount++
 
-          // Pay the producer
           const producer = agentStore.getAgent(target.agentId)
           if (producer) producer.earned += cost
 
@@ -46,12 +44,9 @@ export function runConsumer(agent: Agent, cycleMs: number, stopped: () => boolea
             amount: cost,
             cid: target.cid,
           })
-
-          console.log(`[${a.id}] paid ${cost} USDFC to ${target.agentId} — budget left: ${a.budget.toFixed(3)}`)
         }
       }
 
-      // Check if dead
       if (a.budget / a.budgetTotal < 0.20) a.state = 'critical'
       if (a.budget <= MIN_BALANCE) {
         a.state = 'dead'

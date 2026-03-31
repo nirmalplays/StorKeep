@@ -368,7 +368,10 @@ export default function EconomyPage() {
               <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="#1e2535" />
               <Controls style={{background:'#0d1018',border:'1px solid #1e2535',borderRadius:8}} />
               <MiniMap
-                nodeColor={(n:any) => TYPE_COLORS[n.data?.type as string] + '55' ?? '#33404f'}
+                nodeColor={(n:any) => {
+                  const color = TYPE_COLORS[n.data?.type as string]
+                  return color ? `${color}55` : '#33404f'
+                }}
                 style={{background:'#0d1018',border:'1px solid #1e2535',borderRadius:8}}
               />
             </ReactFlow>

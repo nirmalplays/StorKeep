@@ -14,6 +14,11 @@ export interface AgentEvent {
   finalBalance?: number
   remaining?:  number
   total?:      number
+  dealId?:     string
+  costUsdc?:   string
+  basescanUrl?: string | null
+  filfoxUrl?:  string | null
+  status?:     string
 }
 
 export function useAgentEvents(onEvent: (e: AgentEvent) => void) {

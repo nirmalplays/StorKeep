@@ -49,7 +49,7 @@ const APP_URL =
   process.env.APP_URL ??
   'http://localhost:3000'
 
-type EmitPayload = Omit<AgentEvent, 'timestamp'> & { timestamp?: number }
+type EmitPayload = Omit<AgentEvent, 'type' | 'timestamp'> & { timestamp?: number }
 
 export async function emitAgentEvent(
   type: AgentEvent['type'],

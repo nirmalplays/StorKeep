@@ -28,3 +28,5 @@ storkeep-app/prisma.config.ts
 *.log
 npm-debug.log*
 .turbo
+
+.vercel
