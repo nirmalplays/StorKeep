@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
   title: 'Dev Docs · StorKeep',
-  description: 'Complete setup, Tailwind install flow, and runbook for StorKeep.',
+  description: 'How to use storkeep-sdk in a real project, plus setup, env, deploy, and API routes.',
 }
 
 const envRows = [
@@ -60,13 +60,13 @@ export default function DevDocsPage() {
       <section className="max-w-5xl mx-auto px-6 pt-14 pb-8">
         <h1 className="text-4xl font-bold text-green-400 mb-4">StorKeep Dev Docs</h1>
         <p className="text-gray-400 max-w-3xl">
-          Full install and usage guide: setup, Tailwind workflow, environment config, deploy, and operations.
-          This page is intentionally structured as a step-by-step reference.
+          How to wire <span className="text-green-400">storkeep-sdk</span> into your own backend or script, plus app setup, env, deploy, and operations.
         </p>
         <div className="mt-6 border border-gray-800 bg-gray-950/40 p-4">
           <div className="text-xs text-gray-500 mb-3 uppercase tracking-widest">Navigation</div>
           <div className="flex flex-wrap gap-2 text-sm">
             <a href="#getting-started" className="px-2 py-1 border border-gray-700 text-gray-300 hover:text-green-400 hover:border-green-500/40">Getting Started</a>
+            <a href="#using-sdk" className="px-2 py-1 border border-gray-700 text-gray-300 hover:text-green-400 hover:border-green-500/40">Using the SDK</a>
             <a href="#tailwind-workflow" className="px-2 py-1 border border-gray-700 text-gray-300 hover:text-green-400 hover:border-green-500/40">Tailwind Workflow</a>
             <a href="#environment-variables" className="px-2 py-1 border border-gray-700 text-gray-300 hover:text-green-400 hover:border-green-500/40">Environment Variables</a>
             <a href="#demo-runbook" className="px-2 py-1 border border-gray-700 text-gray-300 hover:text-green-400 hover:border-green-500/40">Demo Runbook</a>
@@ -79,7 +79,7 @@ export default function DevDocsPage() {
       </section>
 
       <section id="getting-started" className="max-w-5xl mx-auto px-6 py-6 scroll-mt-20">
-        <h2 className="text-xl font-bold mb-4">1) Getting Started</h2>
+        <h2 className="text-xl font-bold mb-4">1 · Getting Started</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {installSteps.map((s) => (
             <article key={s.id} className="border border-gray-800 bg-gray-950/40 p-4">
@@ -95,8 +95,141 @@ export default function DevDocsPage() {
         </p>
       </section>
 
+      <section id="using-sdk" className="max-w-5xl mx-auto px-6 py-6 scroll-mt-20 border-t border-gray-900">
+        <h2 className="text-xl font-bold mb-4">2 · Using storkeep-sdk in a real project</h2>
+        <p className="text-gray-400 text-sm max-w-3xl mb-6">
+          The SDK is a small Node-capable client: <span className="text-gray-300">chain reads</span> (deal status),{' '}
+          <span className="text-gray-300">x402-paid renewals and autopilot</span> against the hosted StorKeep API,{' '}
+          <span className="text-gray-300">Synapse/Filecoin store and retrieve</span> (needs a private key), and{' '}
+          <span className="text-gray-300">AgentVault</span> for demo-style autonomous agents.
+          Treat it like any server-side SDK: <span className="text-green-400">never ship private keys to the browser.</span>
+        </p>
+
+        <h3 className="text-sm font-bold text-green-400 uppercase tracking-widest mb-2">Install</h3>
+        <div className="space-y-3 text-gray-300 text-sm mb-8">
+          <p>
+            <span className="text-gray-500">From npm</span> (when published or in your registry):
+          </p>
+          <pre className="bg-gray-950 border border-gray-800 p-4 overflow-x-auto">{`npm install storkeep-sdk viem`}</pre>
+          <p className="text-gray-500">
+            <code className="text-gray-400">viem</code> is a peer dependency used by the x402 payment path; keep it aligned with your app&apos;s version (≥ 2).
+          </p>
+          <p>
+            <span className="text-gray-500">Inside this monorepo</span>, depend on the local package and build it once:
+          </p>
+          <pre className="bg-gray-950 border border-gray-800 p-4 overflow-x-auto">{`# in storkeep-app/package.json
+"storkeep-sdk": "file:../storkeep-sdk"
+
+cd ../storkeep-sdk && npm install && npm run build
+cd ../storkeep-app && npm install`}</pre>
+        </div>
+
+        <h3 className="text-sm font-bold text-green-400 uppercase tracking-widest mb-2">Import surface</h3>
+        <pre className="bg-gray-950 border border-gray-800 p-4 text-xs text-gray-300 overflow-x-auto mb-8">{`import {
+  StorKeep,
+  AgentVault,
+  NETWORKS,
+  getNetworkConfig,
+  // errors: DealNotFoundError, StorKeepError, …
+  // helpers: epochsToHuman, attoFilToFil, …
+} from 'storkeep-sdk'`}</pre>
+
+        <h3 className="text-sm font-bold text-green-400 uppercase tracking-widest mb-2">Configure StorKeep</h3>
+        <p className="text-gray-400 text-sm mb-3">
+          The constructor <span className="text-gray-300">requires</span> either <code className="text-green-400/90">privateKey</code> or{' '}
+          <code className="text-green-400/90">x402Wallet</code> (e.g. a viem <code className="text-gray-400">WalletClient</code>), because paid routes use x402 even when you only call free helpers afterward.
+        </p>
+        <pre className="bg-gray-950 border border-gray-800 p-4 text-xs text-gray-300 overflow-x-auto mb-4">{`import { StorKeep } from 'storkeep-sdk'
+
+const sk = new StorKeep({
+  privateKey: process.env.FILECOIN_WALLET_PRIVATE_KEY as \`0x\${string}\`,
+  network: 'calibration', // or 'mainnet'
+  // Optional overrides:
+  filecoinRpc: process.env.FILECOIN_RPC_URL,
+  storkeepApiUrl: process.env.STORKEEP_API_URL, // defaults: calibration → https://api.calibration.storkeep.xyz
+})`}</pre>
+        <p className="text-gray-500 text-sm mb-8">
+          Default API and RPC URLs match{' '}
+          <code className="text-gray-400">getNetworkConfig(&apos;calibration&apos;)</code> /{' '}
+          <code className="text-gray-400">NETWORKS.calibration</code> in the SDK source.
+        </p>
+
+        <h3 className="text-sm font-bold text-green-400 uppercase tracking-widest mb-2">Deal status (free RPC)</h3>
+        <pre className="bg-gray-950 border border-gray-800 p-4 text-xs text-gray-300 overflow-x-auto mb-8">{`const status = await sk.getDealStatus('5847291')
+// status.needsRenewal, status.epochsUntilExpiry, status.status: 'active' | 'expiring' | 'expired'`}</pre>
+
+        <h3 className="text-sm font-bold text-green-400 uppercase tracking-widest mb-2">Renew a deal (x402 USDC)</h3>
+        <p className="text-gray-400 text-sm mb-3">
+          Calls <code className="text-gray-400">POST {`\${storkeepApiUrl}/api/deals/:dealId/renew`}</code> with automatic payment headers from x402.
+        </p>
+        <pre className="bg-gray-950 border border-gray-800 p-4 text-xs text-gray-300 overflow-x-auto mb-8">{`const out = await sk.renewDeal(dealId, {
+  durationEpochs: undefined, // SDK default: MIN_DEAL_DURATION
+  maxPriceUsdc: 1.0,         // abort if response cost exceeds this
+})
+// out.txHash, out.basescanUrl, out.filfoxUrl, out.actualCostUsdc, …`}</pre>
+
+        <h3 className="text-sm font-bold text-green-400 uppercase tracking-widest mb-2">Autopilot</h3>
+        <pre className="bg-gray-950 border border-gray-800 p-4 text-xs text-gray-300 overflow-x-auto mb-8">{`await sk.enableAutopilot({
+  dealId,
+  renewWhenEpochsLeft: 100_000,
+  maxPriceUsdc: 1.0,
+  webhookUrl: 'https://your.app/hooks/storkeep', // optional
+  webhookSecret: '…', // optional
+})
+const ap = await sk.getAutopilotStatus(dealId)
+await sk.disableAutopilot(dealId)`}</pre>
+
+        <h3 className="text-sm font-bold text-green-400 uppercase tracking-widest mb-2">Balance helper</h3>
+        <pre className="bg-gray-950 border border-gray-800 p-4 text-xs text-gray-300 overflow-x-auto mb-8">{`const { usdc, address, network } = await sk.getBalance()`}</pre>
+
+        <h3 className="text-sm font-bold text-green-400 uppercase tracking-widest mb-2">Storage (Synapse / Filecoin)</h3>
+        <p className="text-gray-400 text-sm mb-3">
+          Requires <code className="text-gray-400">privateKey</code> in the constructor (not x402-only wallet shorthand without private key).
+        </p>
+        <pre className="bg-gray-950 border border-gray-800 p-4 text-xs text-gray-300 overflow-x-auto mb-8">{`const { cid, bytes } = await sk.store(Buffer.from('hello'), { redundancy: 2, ttl: '30d' })
+const buf = await sk.retrieve(cid)
+await sk.prune(cid)`}</pre>
+
+        <h3 className="text-sm font-bold text-green-400 uppercase tracking-widest mb-2">Errors</h3>
+        <p className="text-gray-400 text-sm mb-3">
+          Import typed errors from the same package and branch on them in your service layer.
+        </p>
+        <pre className="bg-gray-950 border border-gray-800 p-4 text-xs text-gray-300 overflow-x-auto mb-8">{`import {
+  StorKeepError,
+  DealNotFoundError,
+  DealExpiredError,
+  RenewalFailedError,
+  X402PaymentError,
+} from 'storkeep-sdk'`}</pre>
+
+        <h3 className="text-sm font-bold text-green-400 uppercase tracking-widest mb-2">AgentVault (agents + optional UI events)</h3>
+        <p className="text-gray-400 text-sm mb-3">
+          Use <code className="text-gray-400">AgentVault</code> when you want producer/consumer/guardian-style agents with budgets, Synapse storage, and listing discovery.
+          Events POST to your app base URL from <code className="text-gray-400">NEXT_PUBLIC_APP_URL</code> / <code className="text-gray-400">APP_URL</code> (same pattern as this repo&apos;s{' '}
+          <code className="text-gray-400">/api/events/emit</code> bridge).
+        </p>
+        <pre className="bg-gray-950 border border-gray-800 p-4 text-xs text-gray-300 overflow-x-auto mb-8">{`import { AgentVault, DEFAULT_POLICIES } from 'storkeep-sdk'
+
+const agent = new AgentVault({
+  agentType: 'producer',
+  network: 'calibration',
+  privateKey: process.env.FILECOIN_WALLET_PRIVATE_KEY as \`0x\${string}\`,
+  budget: '10',
+  rpcUrl: process.env.FILECOIN_RPC_URL,
+  policies: { ...DEFAULT_POLICIES, maxStoredBytes: 1_000_000 },
+})
+await agent.store({ demo: true })`}</pre>
+
+        <h3 className="text-sm font-bold text-green-400 uppercase tracking-widest mb-2">Next.js and security</h3>
+        <ul className="list-disc list-inside text-gray-400 text-sm space-y-2 mb-4">
+          <li>Instantiate <code className="text-gray-400">StorKeep</code> only in <span className="text-gray-300">API routes, Route Handlers, or server actions</span>—never in client components.</li>
+          <li>Pass <code className="text-gray-400">dealId</code> and options from authenticated requests; do not trust raw client input for spend limits.</li>
+          <li>For paid flows, ensure the wallet used by the SDK has enough USDC on the x402 network (e.g. Base Sepolia for calibration).</li>
+        </ul>
+      </section>
+
       <section id="tailwind-workflow" className="max-w-5xl mx-auto px-6 py-6 scroll-mt-20">
-        <h2 className="text-xl font-bold mb-3">2) Tailwind Workflow</h2>
+        <h2 className="text-xl font-bold mb-3">3 · Tailwind Workflow</h2>
         <div className="space-y-3 text-gray-300 text-sm">
           <p><span className="text-green-400">Step 1:</span> Ensure Tailwind is installed in dependencies.</p>
           <pre className="bg-gray-950 border border-gray-800 p-4 overflow-x-auto">{`npm install tailwindcss postcss`}</pre>
@@ -124,7 +257,7 @@ npm run build`}</pre>
       </section>
 
       <section id="environment-variables" className="max-w-5xl mx-auto px-6 py-6 scroll-mt-20">
-        <h2 className="text-xl font-bold mb-3">3) Environment Variables</h2>
+        <h2 className="text-xl font-bold mb-3">4 · Environment Variables</h2>
         <div className="overflow-x-auto border border-gray-800">
           <table className="w-full text-sm">
             <thead className="bg-gray-950">
@@ -150,7 +283,7 @@ npm run build`}</pre>
       </section>
 
       <section id="demo-runbook" className="max-w-5xl mx-auto px-6 py-6 scroll-mt-20">
-        <h2 className="text-xl font-bold mb-3">4) Demo Runbook</h2>
+        <h2 className="text-xl font-bold mb-3">5 · Demo Runbook</h2>
         <ol className="list-decimal list-inside space-y-2 text-gray-300">
           <li>Open <span className="text-green-400">/dashboard</span>.</li>
           <li>Check a deal ID, then run one renewal (demo or paid path).</li>
@@ -161,7 +294,7 @@ npm run build`}</pre>
       </section>
 
       <section id="build-deploy" className="max-w-5xl mx-auto px-6 py-6 scroll-mt-20">
-        <h2 className="text-xl font-bold mb-3">5) Build and Deploy</h2>
+        <h2 className="text-xl font-bold mb-3">6 · Build and Deploy</h2>
         <pre className="bg-gray-950 border border-gray-800 p-5 text-sm text-gray-300 overflow-x-auto">{`# local production check
 npm run build
 
@@ -173,7 +306,7 @@ vercel --prod`}</pre>
       </section>
 
       <section id="api-routes" className="max-w-5xl mx-auto px-6 py-6 pb-16 scroll-mt-20">
-        <h2 className="text-xl font-bold mb-3">6) Core API Routes</h2>
+        <h2 className="text-xl font-bold mb-3">7 · Core API Routes</h2>
         <div className="border border-gray-800 divide-y divide-gray-800">
           {apiRows.map((row) => (
             <div key={row.route} className="p-4">
@@ -185,8 +318,17 @@ vercel --prod`}</pre>
       </section>
 
       <section id="faq" className="max-w-5xl mx-auto px-6 py-6 scroll-mt-20">
-        <h2 className="text-xl font-bold mb-3">7) FAQ</h2>
+        <h2 className="text-xl font-bold mb-3">8 · FAQ</h2>
         <div className="space-y-3">
+          <div className="border border-gray-800 p-4">
+            <div className="text-green-400 mb-1">SDK vs this Next.js app</div>
+            <p className="text-gray-400 text-sm">
+              <span className="text-gray-300">storkeep-sdk</span> is the library you import in your own backend, workers, or scripts
+              (deal status, renewals, autopilot, optional Synapse storage, AgentVault).{' '}
+              <span className="text-gray-300">storkeep-app</span> is the reference UI and API routes that wire those flows to a dashboard and demo;
+              for production integrations you typically call the SDK from your services or call the same StorKeep HTTP API the SDK uses.
+            </p>
+          </div>
           <div className="border border-gray-800 p-4">
             <div className="text-green-400 mb-1">What is StorKeep?</div>
             <p className="text-gray-400 text-sm">
@@ -219,7 +361,7 @@ vercel --prod`}</pre>
       </section>
 
       <section id="troubleshooting" className="max-w-5xl mx-auto px-6 py-6 pb-20 scroll-mt-20">
-        <h2 className="text-xl font-bold mb-3">8) Troubleshooting</h2>
+        <h2 className="text-xl font-bold mb-3">9 · Troubleshooting</h2>
         <div className="space-y-3">
           <div className="border border-gray-800 p-4">
             <div className="text-green-400 mb-1">Build error: Cannot resolve storkeep-sdk</div>
