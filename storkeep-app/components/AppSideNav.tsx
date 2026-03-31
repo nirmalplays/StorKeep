@@ -31,7 +31,7 @@ export function AppSideNav() {
 
   return (
     <aside
-      className="hidden lg:flex shrink-0 w-56 flex-col border-r border-gray-800 bg-black sticky top-0 h-screen overflow-y-auto py-8 pl-5 pr-3 font-mono"
+      className="hidden lg:flex shrink-0 w-56 flex-col border-r border-gray-800 bg-black sticky top-14 h-[calc(100vh-3.5rem)] overflow-y-auto py-8 pl-5 pr-3 font-mono"
       aria-label="Main navigation"
     >
       <Link
