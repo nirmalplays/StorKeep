@@ -68,7 +68,6 @@ export default function DevDocsPage() {
             <a href="/dev-docs/sdk-quickstart" className="px-2 py-1 border border-green-500/30 text-green-400 hover:border-green-400">SDK Quickstart →</a>
             <a href="#getting-started" className="px-2 py-1 border border-gray-700 text-gray-300 hover:text-green-400 hover:border-green-500/40">Getting Started</a>
             <a href="#using-sdk" className="px-2 py-1 border border-gray-700 text-gray-300 hover:text-green-400 hover:border-green-500/40">Using the SDK</a>
-            <a href="#tailwind-workflow" className="px-2 py-1 border border-gray-700 text-gray-300 hover:text-green-400 hover:border-green-500/40">Tailwind Workflow</a>
             <a href="#environment-variables" className="px-2 py-1 border border-gray-700 text-gray-300 hover:text-green-400 hover:border-green-500/40">Environment Variables</a>
             <a href="#demo-runbook" className="px-2 py-1 border border-gray-700 text-gray-300 hover:text-green-400 hover:border-green-500/40">Demo Runbook</a>
             <a href="#build-deploy" className="px-2 py-1 border border-gray-700 text-gray-300 hover:text-green-400 hover:border-green-500/40">Build & Deploy</a>
@@ -229,36 +228,8 @@ await agent.store({ demo: true })`}</pre>
         </ul>
       </section>
 
-      <section id="tailwind-workflow" className="max-w-5xl mx-auto px-6 py-6 scroll-mt-20">
-        <h2 className="text-xl font-bold mb-3">3 · Tailwind Workflow</h2>
-        <div className="space-y-3 text-gray-300 text-sm">
-          <p><span className="text-green-400">Step 1:</span> Ensure Tailwind is installed in dependencies.</p>
-          <pre className="bg-gray-950 border border-gray-800 p-4 overflow-x-auto">{`npm install tailwindcss postcss`}</pre>
-          <p><span className="text-green-400">Step 2:</span> Keep Tailwind directives in global CSS (already present in this repo).</p>
-          <pre className="bg-gray-950 border border-gray-800 p-4 overflow-x-auto">{`@tailwind base;
-@tailwind components;
-@tailwind utilities;`}</pre>
-          <p><span className="text-green-400">Step 3:</span> Use utility classes in components/pages.</p>
-          <pre className="bg-gray-950 border border-gray-800 p-4 overflow-x-auto">{`<h1 className="text-3xl font-bold text-green-400">StorKeep</h1>`}</pre>
-          <p><span className="text-green-400">Step 4:</span> Run local dev and production build checks.</p>
-          <pre className="bg-gray-950 border border-gray-800 p-4 overflow-x-auto">{`npm run dev
-npm run build`}</pre>
-          <p className="text-gray-400">
-            Official Tailwind installation reference: {' '}
-            <a
-              className="text-green-400 underline"
-              href="https://tailwindcss.com/docs/installation/using-vite"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Installing Tailwind with Vite
-            </a>
-          </p>
-        </div>
-      </section>
-
       <section id="environment-variables" className="max-w-5xl mx-auto px-6 py-6 scroll-mt-20">
-        <h2 className="text-xl font-bold mb-3">4 · Environment Variables</h2>
+        <h2 className="text-xl font-bold mb-3">3 · Environment Variables</h2>
         <div className="overflow-x-auto border border-gray-800">
           <table className="w-full text-sm">
             <thead className="bg-gray-950">
@@ -284,7 +255,7 @@ npm run build`}</pre>
       </section>
 
       <section id="demo-runbook" className="max-w-5xl mx-auto px-6 py-6 scroll-mt-20">
-        <h2 className="text-xl font-bold mb-3">5 · Demo Runbook</h2>
+        <h2 className="text-xl font-bold mb-3">4 · Demo Runbook</h2>
         <ol className="list-decimal list-inside space-y-2 text-gray-300">
           <li>Open <span className="text-green-400">/dashboard</span>.</li>
           <li>Check a deal ID, then run one renewal (demo or paid path).</li>
@@ -295,7 +266,7 @@ npm run build`}</pre>
       </section>
 
       <section id="build-deploy" className="max-w-5xl mx-auto px-6 py-6 scroll-mt-20">
-        <h2 className="text-xl font-bold mb-3">6 · Build and Deploy</h2>
+        <h2 className="text-xl font-bold mb-3">5 · Build and Deploy</h2>
         <pre className="bg-gray-950 border border-gray-800 p-5 text-sm text-gray-300 overflow-x-auto">{`# local production check
 npm run build
 
@@ -307,7 +278,7 @@ vercel --prod`}</pre>
       </section>
 
       <section id="api-routes" className="max-w-5xl mx-auto px-6 py-6 pb-16 scroll-mt-20">
-        <h2 className="text-xl font-bold mb-3">7 · Core API Routes</h2>
+        <h2 className="text-xl font-bold mb-3">6 · Core API Routes</h2>
         <div className="border border-gray-800 divide-y divide-gray-800">
           {apiRows.map((row) => (
             <div key={row.route} className="p-4">
@@ -319,7 +290,7 @@ vercel --prod`}</pre>
       </section>
 
       <section id="faq" className="max-w-5xl mx-auto px-6 py-6 scroll-mt-20">
-        <h2 className="text-xl font-bold mb-3">8 · FAQ</h2>
+        <h2 className="text-xl font-bold mb-3">7 · FAQ</h2>
         <div className="space-y-3">
           <div className="border border-gray-800 p-4">
             <div className="text-green-400 mb-1">SDK vs this Next.js app</div>
@@ -362,7 +333,7 @@ vercel --prod`}</pre>
       </section>
 
       <section id="troubleshooting" className="max-w-5xl mx-auto px-6 py-6 pb-20 scroll-mt-20">
-        <h2 className="text-xl font-bold mb-3">9 · Troubleshooting</h2>
+        <h2 className="text-xl font-bold mb-3">8 · Troubleshooting</h2>
         <div className="space-y-3">
           <div className="border border-gray-800 p-4">
             <div className="text-green-400 mb-1">Build error: Cannot resolve storkeep-sdk</div>
