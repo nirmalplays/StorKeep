@@ -63,9 +63,22 @@ export default function DevDocsPage() {
           Full install and usage guide: setup, Tailwind workflow, environment config, deploy, and operations.
           This page is intentionally structured as a step-by-step reference.
         </p>
+        <div className="mt-6 border border-gray-800 bg-gray-950/40 p-4">
+          <div className="text-xs text-gray-500 mb-3 uppercase tracking-widest">Navigation</div>
+          <div className="flex flex-wrap gap-2 text-sm">
+            <a href="#getting-started" className="px-2 py-1 border border-gray-700 text-gray-300 hover:text-green-400 hover:border-green-500/40">Getting Started</a>
+            <a href="#tailwind-workflow" className="px-2 py-1 border border-gray-700 text-gray-300 hover:text-green-400 hover:border-green-500/40">Tailwind Workflow</a>
+            <a href="#environment-variables" className="px-2 py-1 border border-gray-700 text-gray-300 hover:text-green-400 hover:border-green-500/40">Environment Variables</a>
+            <a href="#demo-runbook" className="px-2 py-1 border border-gray-700 text-gray-300 hover:text-green-400 hover:border-green-500/40">Demo Runbook</a>
+            <a href="#build-deploy" className="px-2 py-1 border border-gray-700 text-gray-300 hover:text-green-400 hover:border-green-500/40">Build & Deploy</a>
+            <a href="#api-routes" className="px-2 py-1 border border-gray-700 text-gray-300 hover:text-green-400 hover:border-green-500/40">API Routes</a>
+            <a href="#faq" className="px-2 py-1 border border-gray-700 text-gray-300 hover:text-green-400 hover:border-green-500/40">FAQ</a>
+            <a href="#troubleshooting" className="px-2 py-1 border border-gray-700 text-gray-300 hover:text-green-400 hover:border-green-500/40">Troubleshooting</a>
+          </div>
+        </div>
       </section>
 
-      <section className="max-w-5xl mx-auto px-6 py-6">
+      <section id="getting-started" className="max-w-5xl mx-auto px-6 py-6 scroll-mt-20">
         <h2 className="text-xl font-bold mb-4">1) Getting Started</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {installSteps.map((s) => (
@@ -82,7 +95,7 @@ export default function DevDocsPage() {
         </p>
       </section>
 
-      <section className="max-w-5xl mx-auto px-6 py-6">
+      <section id="tailwind-workflow" className="max-w-5xl mx-auto px-6 py-6 scroll-mt-20">
         <h2 className="text-xl font-bold mb-3">2) Tailwind Workflow</h2>
         <div className="space-y-3 text-gray-300 text-sm">
           <p><span className="text-green-400">Step 1:</span> Ensure Tailwind is installed in dependencies.</p>
@@ -110,7 +123,7 @@ npm run build`}</pre>
         </div>
       </section>
 
-      <section className="max-w-5xl mx-auto px-6 py-6">
+      <section id="environment-variables" className="max-w-5xl mx-auto px-6 py-6 scroll-mt-20">
         <h2 className="text-xl font-bold mb-3">3) Environment Variables</h2>
         <div className="overflow-x-auto border border-gray-800">
           <table className="w-full text-sm">
@@ -136,7 +149,7 @@ npm run build`}</pre>
         </div>
       </section>
 
-      <section className="max-w-5xl mx-auto px-6 py-6">
+      <section id="demo-runbook" className="max-w-5xl mx-auto px-6 py-6 scroll-mt-20">
         <h2 className="text-xl font-bold mb-3">4) Demo Runbook</h2>
         <ol className="list-decimal list-inside space-y-2 text-gray-300">
           <li>Open <span className="text-green-400">/dashboard</span>.</li>
@@ -147,7 +160,7 @@ npm run build`}</pre>
         </ol>
       </section>
 
-      <section className="max-w-5xl mx-auto px-6 py-6">
+      <section id="build-deploy" className="max-w-5xl mx-auto px-6 py-6 scroll-mt-20">
         <h2 className="text-xl font-bold mb-3">5) Build and Deploy</h2>
         <pre className="bg-gray-950 border border-gray-800 p-5 text-sm text-gray-300 overflow-x-auto">{`# local production check
 npm run build
@@ -159,7 +172,7 @@ vercel --prod`}</pre>
         </p>
       </section>
 
-      <section className="max-w-5xl mx-auto px-6 py-6 pb-16">
+      <section id="api-routes" className="max-w-5xl mx-auto px-6 py-6 pb-16 scroll-mt-20">
         <h2 className="text-xl font-bold mb-3">6) Core API Routes</h2>
         <div className="border border-gray-800 divide-y divide-gray-800">
           {apiRows.map((row) => (
@@ -171,8 +184,42 @@ vercel --prod`}</pre>
         </div>
       </section>
 
-      <section className="max-w-5xl mx-auto px-6 py-6 pb-20">
-        <h2 className="text-xl font-bold mb-3">7) Troubleshooting + FAQ</h2>
+      <section id="faq" className="max-w-5xl mx-auto px-6 py-6 scroll-mt-20">
+        <h2 className="text-xl font-bold mb-3">7) FAQ</h2>
+        <div className="space-y-3">
+          <div className="border border-gray-800 p-4">
+            <div className="text-green-400 mb-1">What is StorKeep?</div>
+            <p className="text-gray-400 text-sm">
+              StorKeep is a Filecoin-focused automation app that monitors deals and renews them before expiry,
+              with optional autopilot and a live Agent Vault demo for autonomous storage-economy behavior.
+            </p>
+          </div>
+          <div className="border border-gray-800 p-4">
+            <div className="text-green-400 mb-1">What problem does it solve?</div>
+            <p className="text-gray-400 text-sm">
+              Filecoin deals can expire and data availability can degrade if renewals are missed. StorKeep reduces
+              manual operations by automating health checks, renewal triggers, and tracking renewal outcomes.
+            </p>
+          </div>
+          <div className="border border-gray-800 p-4">
+            <div className="text-green-400 mb-1">Who is it built for?</div>
+            <p className="text-gray-400 text-sm">
+              Teams and builders storing important data on Filecoin: app developers, protocol teams, infra operators,
+              and hackathon builders who need a visible, automated renewal workflow.
+            </p>
+          </div>
+          <div className="border border-gray-800 p-4">
+            <div className="text-green-400 mb-1">Is it open source?</div>
+            <p className="text-gray-400 text-sm">
+              Yes. StorKeep is hosted publicly on GitHub in this repository and can be cloned, modified,
+              and redeployed for your own workflows.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="troubleshooting" className="max-w-5xl mx-auto px-6 py-6 pb-20 scroll-mt-20">
+        <h2 className="text-xl font-bold mb-3">8) Troubleshooting</h2>
         <div className="space-y-3">
           <div className="border border-gray-800 p-4">
             <div className="text-green-400 mb-1">Build error: Cannot resolve storkeep-sdk</div>
