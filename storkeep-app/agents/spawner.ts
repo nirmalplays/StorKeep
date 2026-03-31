@@ -1,28 +1,29 @@
 import { agentStore, type Agent } from '@/lib/agent-state'
-import { eventBus } from '@/lib/event-bus'
+import { emitAgentEvent } from '@/lib/event-bus'
 import { runProducer } from './producer'
 import { runConsumer } from './consumer'
 import { runGuardian } from './guardian'
 
-const CYCLE_MS          = parseInt(process.env.CYCLE_MS          ?? '8000')
-const GUARDIAN_CYCLE_MS = parseInt(process.env.GUARDIAN_CYCLE_MS ?? '15000')
+// Fast cycles for 2-min demo
+const CYCLE_MS          = parseInt(process.env.CYCLE_MS          ?? '2000')
+const GUARDIAN_CYCLE_MS = parseInt(process.env.GUARDIAN_CYCLE_MS ?? '3000')
 
 export interface SpawnConfig {
   producers:  number
   consumers:  { budget: number }[]
   guardians:  number
-  preKill:    number    // how many agents to pre-kill for demo
+  preKill:    number
 }
 
 export const DEFAULT_SPAWN: SpawnConfig = {
   producers: 3,
   consumers: [
-    { budget: 3 },    // low — dies fastest
-    { budget: 7 },    // medium
-    { budget: 15 },   // high
+    { budget: 2 },   // dies in ~10s
+    { budget: 5 },   // dies in ~25s
+    { budget: 10 },  // dies in ~50s
   ],
   guardians: 1,
-  preKill: 2,
+  preKill: 0,        // start all alive so judges see full lifecycle
 }
 
 let stopSignal = false
@@ -36,75 +37,59 @@ export async function spawnEconomy(config: SpawnConfig = DEFAULT_SPAWN) {
 
   const agents: Agent[] = []
 
-  // Spawn producers
   for (let i = 0; i < config.producers; i++) {
     const id = `producer-${i + 1}`
     const a: Agent = {
-      id,
-      type:        'producer',
-      state:       'alive',
-      budget:      20,
-      budgetTotal: 20,
-      storedBytes: 0,
-      txCount:     0,
-      earned:      0,
-      bornAt:      Date.now(),
-      activeCIDs:  [],
+      id, type: 'producer', state: 'alive',
+      budget: 20, budgetTotal: 20,
+      storedBytes: 0, txCount: 0, earned: 0,
+      bornAt: Date.now(), activeCIDs: [],
     }
     agentStore.addAgent(a)
     agents.push(a)
   }
 
-  // Spawn consumers
   config.consumers.forEach((c, i) => {
     const id = `consumer-${i + 1}`
     const a: Agent = {
-      id,
-      type:        'consumer',
-      state:       'alive',
-      budget:      c.budget,
-      budgetTotal: c.budget,
-      storedBytes: 0,
-      txCount:     0,
-      earned:      0,
-      bornAt:      Date.now(),
-      activeCIDs:  [],
+      id, type: 'consumer', state: 'alive',
+      budget: c.budget, budgetTotal: c.budget,
+      storedBytes: 0, txCount: 0, earned: 0,
+      bornAt: Date.now(), activeCIDs: [],
     }
     agentStore.addAgent(a)
     agents.push(a)
   })
 
-  // Spawn guardians
   for (let i = 0; i < config.guardians; i++) {
     const id = `guardian-${i + 1}`
     const a: Agent = {
-      id,
-      type:        'guardian',
-      state:       'alive',
-      budget:      8,
-      budgetTotal: 8,
-      storedBytes: 0,
-      txCount:     0,
-      earned:      0,
-      bornAt:      Date.now(),
-      activeCIDs:  [],
+      id, type: 'guardian', state: 'alive',
+      budget: 8, budgetTotal: 8,
+      storedBytes: 0, txCount: 0, earned: 0,
+      bornAt: Date.now(), activeCIDs: [],
     }
     agentStore.addAgent(a)
     agents.push(a)
   }
 
-  // Pre-kill some agents (grey ghosts from frame 1)
-  for (let i = 0; i < Math.min(config.preKill, agents.length); i++) {
-    const victim = agents[agents.length - 1 - i]
-    victim.state  = 'dead'
-    victim.budget = 0
-    victim.diedAt = Date.now() - Math.random() * 3_600_000  // died 0-1h ago
-    eventBus.emit('agent:died', {
-      type: 'agent:died', agentId: victim.id, finalBalance: 0, timestamp: victim.diedAt!,
-    })
+  // Pre-kill after delay so judges see agents die live
+  if (config.preKill > 0) {
+    setTimeout(() => {
+      for (let i = 0; i < Math.min(config.preKill, agents.length); i++) {
+        const victim = agents[agents.length - 1 - i]
+        victim.state = 'dead'
+        victim.budget = 0
+        victim.diedAt = Date.now()
+        void emitAgentEvent('agent:died', {
+          agentId: victim.id,
+          finalBalance: 0,
+          timestamp: victim.diedAt!,
+        })
+      }
+    }, 30_000)
   }
 
-  // Start agent loops
   const aliveAgents = agents.filter(a => a.state !== 'dead')
 
   for (const a of aliveAgents) {

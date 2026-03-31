@@ -9,6 +9,12 @@ export function SiteNav() {
         </Link>
         <nav className="flex items-center gap-5 sm:gap-8 text-sm flex-wrap justify-end">
           <Link
+            href="/dev-docs"
+            className="text-gray-400 hover:text-green-400 transition-colors"
+          >
+            Dev Docs
+          </Link>
+          <Link
             href="/dashboard"
             className="text-gray-400 hover:text-green-400 transition-colors"
           >

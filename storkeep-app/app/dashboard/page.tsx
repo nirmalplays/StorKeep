@@ -3,6 +3,9 @@ import { useState, useEffect, useRef } from 'react'
 import { X402LogPanel } from '@/components/X402LogPanel'
 import { connectBaseSepoliaWallet, getWalletClient } from '@/lib/wallet'
 
+const REGISTRY_CONTRACT = '0x7CC100a2c115e5B02F7BbaC7616D290A17D89397'
+const VAULT_WALLET = '0x4e51EA274b9a6192B2BBB7734b6bE50bC7B4752B'
+
 interface DealStatus {
   dealId: string
   providerMinerId: string
@@ -21,6 +24,7 @@ interface RenewalResult {
   txHash?: string
   registryTxHash?: string
   registryFilfoxUrl?: string
+  raasTxHash?: string
 }
 
 export default function DashboardPage() {
@@ -28,28 +32,89 @@ export default function DashboardPage() {
   const [status, setStatus] = useState<DealStatus | null>(null)
   const [renewed, setRenewed] = useState<RenewalResult | null>(null)
   const [autopiloted, setAutopiloted] = useState(false)
+  const [dealsRenewedCount, setDealsRenewedCount] = useState(0)
+  const [autopilotCount, setAutopilotCount] = useState(0)
+  const [countsLoaded, setCountsLoaded] = useState(false)
   const [demoMode, setDemoMode] = useState(false)
   const [demoLog, setDemoLog] = useState<string[]>([])
   const [logActive, setLogActive] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [walletAddress, setWalletAddress] = useState<string | null>(null)
+  const [walletBalance, setWalletBalance] = useState<string | null>(null)
+  const [vaultBalance, setVaultBalance] = useState<string | null>(null)
   const [autoRunning, setAutoRunning] = useState(false)
   const [expiryTx, setExpiryTx] = useState<string | null>(null)
   const [expiryCountdown, setExpiryCountdown] = useState(0)
-  const autoRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [autoCountdown, setAutoCountdown] = useState(0)
+  const [renewalHistory, setRenewalHistory] = useState<RenewalResult[]>([])
+  const autoRef = useRef<any>(null)
+  const countdownRef = useRef<any>(null)
+  const autoCountdownRef = useRef<any>(null)
 
   useEffect(() => {
+    // Always fetch vault wallet balance (the one that pays gas)
+    fetchBalance(VAULT_WALLET, true)
+
+    // Also get connected MetaMask wallet
     getWalletClient().then((w: any) => {
-      if (w) setWalletAddress(w.account.address)
+      if (w) {
+        setWalletAddress(w.account.address)
+        fetchBalance(w.account.address, false)
+      }
     })
   }, [])
 
+  // Load persisted counters for demo so they survive reloads during judging
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const renewed = Number.parseInt(window.localStorage.getItem('storkeep_dealsRenewed') ?? '0', 10)
+    const autos   = Number.parseInt(window.localStorage.getItem('storkeep_autopilotCount') ?? '0', 10)
+    if (!Number.isNaN(renewed)) setDealsRenewedCount(renewed)
+    if (!Number.isNaN(autos))   setAutopilotCount(autos)
+    setCountsLoaded(true)
+  }, [])
+
+  useEffect(() => {
+    if (!countsLoaded) return
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem('storkeep_dealsRenewed', String(dealsRenewedCount))
+  }, [dealsRenewedCount, countsLoaded])
+
+  useEffect(() => {
+    if (!countsLoaded) return
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem('storkeep_autopilotCount', String(autopilotCount))
+  }, [autopilotCount, countsLoaded])
+
+  async function fetchBalance(address: string, isVault: boolean) {
+    try {
+      const res = await fetch('https://api.calibration.node.glif.io/rpc/v1', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0', id: 1,
+          method: 'Filecoin.EthGetBalance',
+          params: [address, 'latest']
+        })
+      })
+      const data = await res.json()
+      if (data.result) {
+        const bal = (parseInt(data.result, 16) / 1e18).toFixed(4) + ' tFIL'
+        if (isVault) setVaultBalance(bal)
+        else setWalletBalance(bal)
+      }
+    } catch {
+      if (isVault) setVaultBalance('—')
+      else setWalletBalance('—')
+    }
+  }
+
   useEffect(() => {
     return () => {
-      if (autoRef.current) clearInterval(autoRef.current)
+      if (autoRef.current) clearTimeout(autoRef.current)
       if (countdownRef.current) clearInterval(countdownRef.current)
+      if (autoCountdownRef.current) clearInterval(autoCountdownRef.current)
     }
   }, [])
 
@@ -57,6 +122,7 @@ export default function DashboardPage() {
     try {
       const w = await connectBaseSepoliaWallet()
       setWalletAddress(w.account.address)
+      fetchBalance(w.account.address, false)
     } catch (e: any) {
       setError(e.message)
     }
@@ -83,7 +149,7 @@ export default function DashboardPage() {
     }
   }
 
-  async function renewDealDemo() {
+  async function renewDealDemo(): Promise<RenewalResult | null> {
     setLoading(true)
     setError(null)
     try {
@@ -92,9 +158,14 @@ export default function DashboardPage() {
       if (!res.ok) throw new Error(data.error ?? 'Renewal failed')
       setLogActive(true)
       setRenewed(data)
+      setRenewalHistory(prev => [data, ...prev].slice(0, 10))
+      setDealsRenewedCount(c => c + 1)
+      // Refresh vault balance after renewal
+      fetchBalance(VAULT_WALLET, true)
       return data
     } catch (e: any) {
       setError(e.message)
+      return null
     } finally {
       setLoading(false)
     }
@@ -109,7 +180,9 @@ export default function DashboardPage() {
       if (!res.ok) throw new Error(data.error ?? 'Renewal failed')
       setLogActive(true)
       setRenewed(data)
-      return data
+      setRenewalHistory(prev => [data, ...prev].slice(0, 10))
+      setDealsRenewedCount(c => c + 1)
+      fetchBalance(VAULT_WALLET, true)
     } catch (e: any) {
       setError(e.message)
     } finally {
@@ -129,6 +202,7 @@ export default function DashboardPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Autopilot failed')
       setAutopiloted(true)
+      setAutopilotCount(c => c + 1)
     } catch (e: any) {
       setError(e.message)
     } finally {
@@ -164,32 +238,58 @@ export default function DashboardPage() {
     }
   }
 
-  function startDemoLoop() {
+  function startAutoRenew() {
+    if (!dealId) { setError('Enter a Deal ID first'); return }
     setAutoRunning(true)
     setDemoLog([])
-    let i = 0
-    const msgs = [
-      '⏱  tick 1 — checking deal expiry...',
-      `✅  deal ${dealId} OK — ${status?.daysUntilExpiry.toFixed(0)} days left`,
-      '⏱  tick 2 — checking deal expiry...',
-      `⚠️  deal ${dealId} approaching expiry threshold`,
-      '💸  x402 payment triggered — $0.001 USDC',
-      '🔗  submitRaaS() confirmed on Filecoin Calibration',
-      '✅  deal renewed — autopilot cycle complete',
+    setAutoCountdown(120)
+
+    if (autoCountdownRef.current) clearInterval(autoCountdownRef.current)
+    autoCountdownRef.current = setInterval(() => {
+      setAutoCountdown(c => {
+        if (c <= 1) { clearInterval(autoCountdownRef.current!); return 0 }
+        return c - 1
+      })
+    }, 1000)
+
+    const startMsgs = [
+      '🔍 Auto-renew started — monitoring deal ' + dealId,
+      '⏱  Checking expiry every 2 minutes...',
+      '📡 Polling Filecoin Calibration RPC...',
+      '⚠️  Deal approaching threshold — queuing renewal',
+      '💸 Triggering renewal — $0.001 USDC',
     ]
-    autoRef.current = setInterval(() => {
-      if (i < msgs.length) {
-        setDemoLog(prev => [...prev, msgs[i++]])
+    let i = 0
+    const logInterval = setInterval(() => {
+      if (i < startMsgs.length) {
+        setDemoLog(prev => [...prev, startMsgs[i++]])
       } else {
-        clearInterval(autoRef.current!)
-        setAutoRunning(false)
+        clearInterval(logInterval)
       }
-    }, 1200)
+    }, 1500)
+
+    autoRef.current = setTimeout(async () => {
+      setDemoLog(prev => [...prev, '🔗 Submitting RaaS renewal on-chain...'])
+      const result = await renewDealDemo()
+      if (result) {
+        setDemoLog(prev => [
+          ...prev,
+          `✅ Renewed! TX: ${result.raasTxHash?.slice(0, 20)}...`,
+          `📋 New expiry epoch: ${result.newExpiryEpoch}`,
+          `💰 Cost: $${result.actualCostUsdc} USDC`,
+          '🔄 Next check in 2 minutes...',
+        ])
+      }
+      setAutoRunning(false)
+    }, 120_000)
   }
 
-  function stopDemoLoop() {
-    clearInterval(autoRef.current!)
+  function stopAutoRenew() {
+    if (autoRef.current) clearTimeout(autoRef.current)
+    if (autoCountdownRef.current) clearInterval(autoCountdownRef.current)
     setAutoRunning(false)
+    setAutoCountdown(0)
+    setDemoLog(prev => [...prev, '⛔ Auto-renew stopped'])
   }
 
   const card = (children: React.ReactNode) => (
@@ -225,26 +325,66 @@ export default function DashboardPage() {
 
   return (
     <main style={{ minHeight: '100vh', background: '#0d0d0d', padding: '2rem 1rem', color: '#eee' }}>
-      <div style={{ maxWidth: 640, margin: '0 auto', fontFamily: 'monospace' }}>
+      <div style={{ maxWidth: 680, margin: '0 auto', fontFamily: 'monospace' }}>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
           <div>
             <h1 style={{ color: '#00ff88', fontSize: 22, margin: 0 }}>StorKeep</h1>
             <div style={{ color: '#444', fontSize: 12 }}>Filecoin deal manager · Calibration testnet</div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            {walletAddress
-              ? <div style={{ fontSize: 11, color: '#555' }}>{walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}</div>
-              : outlineBtn('Connect Wallet', connectWallet, '#888')
-            }
+            {/* Vault wallet — always shown */}
+            <div style={{ marginBottom: 6 }}>
+              <div style={{ fontSize: 10, color: '#333', textTransform: 'uppercase', letterSpacing: 1 }}>Vault Wallet</div>
+              <div style={{ fontSize: 11, color: '#ff8800' }}>
+                {VAULT_WALLET.slice(0, 6)}...{VAULT_WALLET.slice(-4)}
+              </div>
+              <div style={{ fontSize: 11, color: vaultBalance && vaultBalance !== '0.0000 tFIL' ? '#00ff88' : '#555' }}>
+                {vaultBalance ?? 'fetching...'}
+              </div>
+            </div>
+            {/* Connected wallet */}
+            {walletAddress ? (
+              <div>
+                <div style={{ fontSize: 10, color: '#333', textTransform: 'uppercase', letterSpacing: 1 }}>Connected</div>
+                <div style={{ fontSize: 11, color: '#4488ff' }}>{walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}</div>
+                {walletBalance && <div style={{ fontSize: 11, color: '#555' }}>{walletBalance}</div>}
+              </div>
+            ) : outlineBtn('Connect Wallet', connectWallet, '#888')}
           </div>
         </div>
 
+        {/* High-level counters */}
+        <div style={{ display: 'flex', gap: 12, marginBottom: '1.5rem' }}>
+          <div style={{ flex: 1, background: '#111', border: '1px solid #222', borderRadius: 10, padding: '0.75rem 1rem' }}>
+            <div style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>Deals renewed this session</div>
+            <div style={{ fontSize: 22, color: '#00ff88', fontWeight: 700 }}>{dealsRenewedCount}</div>
+          </div>
+          <div style={{ flex: 1, background: '#111', border: '1px solid #222', borderRadius: 10, padding: '0.75rem 1rem' }}>
+            <div style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>Autopilot activations</div>
+            <div style={{ fontSize: 22, color: '#4488ff', fontWeight: 700 }}>{autopilotCount}</div>
+          </div>
+        </div>
+
+        {/* Contract Address Banner */}
+        {card(
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: 11, color: '#555', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>StorKeep Registry Contract</div>
+              <div style={{ fontSize: 12, color: '#00ff88', letterSpacing: 0.5 }}>{REGISTRY_CONTRACT}</div>
+            </div>
+            <a href={`https://calibration.filfox.info/en/address/${REGISTRY_CONTRACT}`} target="_blank" rel="noreferrer"
+              style={{ fontSize: 11, color: '#4488ff', textDecoration: 'none' }}>View on Filfox ↗</a>
+          </div>
+        )}
+
+        {/* Demo Mode Toggle */}
         {card(
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <div style={{ color: '#ccc', fontSize: 13 }}>Demo Mode</div>
-              <div style={{ color: '#555', fontSize: 11 }}>Bypass x402 payment — use fake coins</div>
+              <div style={{ color: '#555', fontSize: 11 }}>Real on-chain renewal · skips USDC payment gate</div>
             </div>
             <div onClick={() => setDemoMode(d => !d)} style={{
               width: 44, height: 24, borderRadius: 12, cursor: 'pointer',
@@ -258,6 +398,7 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {/* Deal ID Input */}
         {card(<>
           {label('Deal ID')}
           <div style={{ display: 'flex', gap: 8 }}>
@@ -282,6 +423,7 @@ export default function DashboardPage() {
 
         {loading && <div style={{ color: '#555', fontSize: 13, marginBottom: '1rem' }}>loading...</div>}
 
+        {/* Deal Status Card */}
         {status && !loading && card(<>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
             <div>
@@ -294,46 +436,40 @@ export default function DashboardPage() {
               borderRadius: 6, padding: '4px 10px', fontSize: 12,
               color: status.status === 'active' ? '#00cc66' : '#ff4444',
               alignSelf: 'flex-start',
-            }}>{status.status}</div>
+            }}>{status.status?.toUpperCase()}</div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>{label('Provider')}<div style={{ color: '#ccc', fontSize: 13 }}>{status.providerMinerId}</div></div>
-            <div>{label('Expires')}<div style={{ color: status.daysUntilExpiry < 30 ? '#ff8800' : '#ccc', fontSize: 13 }}>{status.daysUntilExpiry.toFixed(0)} days</div></div>
+            <div>{label('Expires')}<div style={{ color: status.daysUntilExpiry < 30 ? '#ff8800' : '#ccc', fontSize: 13 }}>{status.daysUntilExpiry?.toFixed(0)} days</div></div>
             <div>{label('Renewal Cost')}<div style={{ color: '#ccc', fontSize: 13 }}>${status.renewalCostUsdc} USDC</div></div>
-            <div>{label('Needs Renewal')}<div style={{ color: status.needsRenewal ? '#ff8800' : '#00cc66', fontSize: 13 }}>{status.needsRenewal ? '⚠️  Yes' : '✅  No'}</div></div>
+            <div>{label('Needs Renewal')}<div style={{ color: status.needsRenewal ? '#ff8800' : '#00cc66', fontSize: 13 }}>{status.needsRenewal ? '⚠️ Yes' : '✅ No'}</div></div>
           </div>
 
           <div style={{ borderTop: '1px solid #1a1a1a', paddingTop: 12 }}>
             {demoMode ? (<>
-              <div style={{ color: '#555', fontSize: 11, marginBottom: 8 }}>DEMO (NO PAYMENT)</div>
+              <div style={{ color: '#555', fontSize: 11, marginBottom: 8 }}>DEMO MODE · REAL ON-CHAIN RENEWAL</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                {btn('Renew (demo)', renewDealDemo)}
-                {outlineBtn('Autopilot (demo)', enableAutopilotDemo, '#888')}
+                {btn('Renew Now (demo)', renewDealDemo)}
                 {autoRunning
-                  ? outlineBtn('■ Stop', stopDemoLoop, '#ff4444')
-                  : outlineBtn('▶ Start Demo (every 5 min)', startDemoLoop, '#888')
+                  ? outlineBtn(`⏱ Stop Auto (${Math.floor(autoCountdown / 60)}:${String(autoCountdown % 60).padStart(2, '0')})`, stopAutoRenew, '#ff4444')
+                  : outlineBtn('▶ Auto-Renew (2 min)', startAutoRenew, '#00ff88')
                 }
+                {outlineBtn('Autopilot (demo)', enableAutopilotDemo, '#888')}
               </div>
               <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #1a1a1a' }}>
-                <div style={{ color: '#555', fontSize: 11, marginBottom: 8 }}>DEMO EXPIRY CONTROL</div>
+                <div style={{ color: '#555', fontSize: 11, marginBottom: 8 }}>EXPIRY CONTROL</div>
                 <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                   {outlineBtn('⏱ Set 2-min Expiry On-Chain', setDemoExpiry, '#ff8800')}
                   {expiryCountdown > 0 && (
                     <div style={{ fontSize: 12, color: '#ff8800' }}>
-                      expires in {Math.floor(expiryCountdown / 60)}:{String(expiryCountdown % 60).padStart(2, '0')} — then click Check
+                      expires in {Math.floor(expiryCountdown / 60)}:{String(expiryCountdown % 60).padStart(2, '0')}
                     </div>
-                  )}
-                  {expiryCountdown === 0 && expiryTx && (
-                    <div style={{ fontSize: 12, color: '#00cc66' }}>✓ expired — click Check then Renew (demo)</div>
                   )}
                 </div>
                 {expiryTx && (
                   <div style={{ marginTop: 6, fontSize: 11, color: '#555' }}>
-                    on-chain tx:{' '}
-                    <a href={`https://calibration.filfox.info/en/tx/${expiryTx}`} target="_blank" rel="noreferrer" style={{ color: '#ff8800' }}>
-                      Filfox →
-                    </a>
+                    on-chain tx: <a href={`https://calibration.filfox.info/en/tx/${expiryTx}`} target="_blank" rel="noreferrer" style={{ color: '#ff8800' }}>Filfox ↗</a>
                   </div>
                 )}
               </div>
@@ -345,15 +481,17 @@ export default function DashboardPage() {
           </div>
         </>)}
 
+        {/* Auto-renew log */}
         {demoLog.length > 0 && (
           <div style={{ background: '#0a0a0a', border: '1px solid #1a1a1a', borderRadius: 8, padding: '12px 16px', marginBottom: '1rem', fontSize: 12 }}>
-            <div style={{ color: '#333', marginBottom: 8, fontSize: 11 }}>── autopilot demo log ──</div>
+            <div style={{ color: '#333', marginBottom: 8, fontSize: 11 }}>── auto-renew log ──</div>
             {demoLog.map((l, i) => (
               <div key={i} style={{ color: '#666', marginBottom: 4 }}>{l}</div>
             ))}
           </div>
         )}
 
+        {/* Latest Renewal Result */}
         {renewed && card(<>
           <div style={{ color: '#00ff88', fontSize: 14, marginBottom: 12 }}>✅ Deal renewed successfully</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
@@ -361,16 +499,21 @@ export default function DashboardPage() {
             <div>{label('Cost Paid')}<div style={{ color: '#ccc', fontSize: 13 }}>${renewed.actualCostUsdc} USDC</div></div>
           </div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            {renewed.filfoxUrl && renewed.txHash && (
-              <a href={renewed.filfoxUrl} target="_blank" rel="noreferrer" style={{ color: '#00ff88', fontSize: 12 }}>↗ Filfox TX (Lighthouse RaaS)</a>
-            )}
-            {renewed.basescanUrl && (
-              <a href={renewed.basescanUrl} target="_blank" rel="noreferrer" style={{ color: '#4488ff', fontSize: 12 }}>↗ BaseScan TX (USDC)</a>
-            )}
-            {renewed.registryFilfoxUrl && (
-              <a href={renewed.registryFilfoxUrl} target="_blank" rel="noreferrer" style={{ color: '#ff8800', fontSize: 12 }}>↗ Registry TX (StorKeep)</a>
-            )}
+            {renewed.filfoxUrl && <a href={renewed.filfoxUrl} target="_blank" rel="noreferrer" style={{ color: '#00ff88', fontSize: 12 }}>↗ Filfox TX (Lighthouse RaaS)</a>}
+            {renewed.basescanUrl && <a href={renewed.basescanUrl} target="_blank" rel="noreferrer" style={{ color: '#4488ff', fontSize: 12 }}>↗ BaseScan TX (USDC)</a>}
+            {renewed.registryFilfoxUrl && <a href={renewed.registryFilfoxUrl} target="_blank" rel="noreferrer" style={{ color: '#ff8800', fontSize: 12 }}>↗ Registry TX (StorKeep)</a>}
           </div>
+        </>)}
+
+        {/* Renewal History */}
+        {renewalHistory.length > 0 && card(<>
+          <div style={{ color: '#555', fontSize: 11, marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 }}>Renewal History</div>
+          {renewalHistory.map((r, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: i < renewalHistory.length - 1 ? '1px solid #1a1a1a' : 'none' }}>
+              <div style={{ fontSize: 12, color: '#888' }}>#{renewalHistory.length - i} · ${r.actualCostUsdc} USDC · epoch {r.newExpiryEpoch}</div>
+              {r.filfoxUrl && <a href={r.filfoxUrl} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: '#00ff88' }}>TX ↗</a>}
+            </div>
+          ))}
         </>)}
 
         {autopiloted && card(

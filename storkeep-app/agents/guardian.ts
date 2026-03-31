@@ -1,6 +1,6 @@
 import { StorKeep } from 'storkeep-sdk'
 import { agentStore, type Agent } from '@/lib/agent-state'
-import { eventBus } from '@/lib/event-bus'
+import { emitAgentEvent } from '@/lib/event-bus'
 import { getAgentFilecoinPrivateKey } from '@/lib/agent-wallet'
 
 const BASESCAN = 'https://sepolia.basescan.org/tx'
@@ -73,8 +73,7 @@ export function runGuardian(agent: Agent, cycleMs: number, stopped: () => boolea
               if (result.paymentTxHash) console.log(`  BaseScan: ${BASESCAN}/${result.paymentTxHash}`)
               if (result.txHash)        console.log(`  Filfox:   ${FILFOX}/${result.txHash}`)
 
-              eventBus.emit('agent:renew', {
-                type:           'agent:renew',
+              await emitAgentEvent('agent:renew', {
                 agentId:        a.id,
                 dealId,
                 cid,
@@ -83,7 +82,6 @@ export function runGuardian(agent: Agent, cycleMs: number, stopped: () => boolea
                 filecoinTxHash: result.txHash ?? null,
                 basescanUrl:    result.paymentTxHash ? `${BASESCAN}/${result.paymentTxHash}` : null,
                 filfoxUrl:      result.txHash ? `${FILFOX}/${result.txHash}` : null,
-                timestamp:      Date.now(),
               })
 
             } catch (e: unknown) {
@@ -99,15 +97,19 @@ export function runGuardian(agent: Agent, cycleMs: number, stopped: () => boolea
         }
       }
 
-      eventBus.emit('agent:budget', {
-        type: 'agent:budget', agentId: a.id, remaining: a.budget, total: agent.budgetTotal,
-        timestamp: Date.now(),
+      await emitAgentEvent('agent:budget', {
+        agentId: a.id,
+        remaining: a.budget,
+        total: agent.budgetTotal,
       })
 
       if (a.budget <= 0) {
         a.state  = 'dead'
         a.diedAt = Date.now()
-        eventBus.emit('agent:died', { type: 'agent:died', agentId: a.id, finalBalance: 0, timestamp: Date.now() })
+        await emitAgentEvent('agent:died', {
+          agentId: a.id,
+          finalBalance: 0,
+        })
         break
       }
     }

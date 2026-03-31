@@ -43,3 +43,32 @@ const globalForBus = globalThis as unknown as { agentEventBus: AgentEventBus | u
 export const eventBus: AgentEventBus =
   globalForBus.agentEventBus ?? new AgentEventBus()
 if (process.env.NODE_ENV !== 'production') globalForBus.agentEventBus = eventBus
+
+const APP_URL =
+  process.env.NEXT_PUBLIC_APP_URL ??
+  process.env.APP_URL ??
+  'http://localhost:3000'
+
+type EmitPayload = Omit<AgentEvent, 'timestamp'> & { timestamp?: number }
+
+export async function emitAgentEvent(
+  type: AgentEvent['type'],
+  payload: EmitPayload,
+): Promise<void> {
+  const ts = payload.timestamp ?? Date.now()
+  const full: AgentEvent = { ...(payload as AgentEvent), type, timestamp: ts }
+
+  // Emit locally for any in-process listeners (history, logs)
+  eventBus.emit(type, full)
+
+  // Bridge across processes to the central event bus/API
+  try {
+    await fetch(`${APP_URL}/api/events/emit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(full),
+    })
+  } catch {
+    // Best-effort only; UI should still work when in same process
+  }
+}

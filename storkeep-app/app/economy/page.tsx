@@ -1,16 +1,16 @@
 'use client'
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import ReactFlow, {
   Background, Controls, MiniMap, BackgroundVariant,
   useNodesState, useEdgesState, addEdge,
   type Node, type Edge, type Connection,
+  MarkerType,
 } from 'reactflow'
 import 'reactflow/dist/style.css'
 import { AgentNodeCard, type AgentNodeData } from '@/components/EconomyFlowNode'
 import { TxFeed } from '@/components/TxFeed'
 import { useAgentEvents, type AgentEvent } from '@/hooks/useAgentEvents'
 
-// ── Node positions — left: producers, center: filecoin, right: consumers, bottom: guardian
 const POSITIONS: Record<string, {x:number;y:number}> = {
   'producer-1': { x:  80, y:  60 },
   'producer-2': { x:  80, y: 280 },
@@ -20,6 +20,26 @@ const POSITIONS: Record<string, {x:number;y:number}> = {
   'consumer-2': { x: 880, y: 280 },
   'consumer-3': { x: 880, y: 500 },
   'guardian-1': { x: 460, y: 540 },
+}
+
+const TYPE_COLORS: Record<string, string> = {
+  producer: '#00ff88',
+  consumer: '#4488ff',
+  guardian: '#ff8800',
+  filecoin: '#0090ff',
+}
+
+function makeEdge(id: string, source: string, target: string, color: string, label?: string): Edge {
+  return {
+    id, source, target,
+    type: 'smoothstep',
+    animated: true,
+    label,
+    labelStyle: { fill: color, fontSize: 9, fontFamily: 'monospace' },
+    labelBgStyle: { fill: '#0d1018', fillOpacity: 0.8 },
+    markerEnd: { type: MarkerType.ArrowClosed, color, width: 16, height: 16 },
+    style: { stroke: color + '66', strokeWidth: 1.8 },
+  }
 }
 
 function agentToNode(a: any): Node<AgentNodeData> {
@@ -39,28 +59,14 @@ function agentToNode(a: any): Node<AgentNodeData> {
 function agentsToEdges(agents: any[]): Edge[] {
   const edges: Edge[] = []
   agents.filter(a => a.type === 'producer').forEach(a => {
-    edges.push({
-      id: `e-${a.id}-fc`, source: a.id, target: 'filecoin',
-      sourceHandle: 'out', targetHandle: 'in',
-      type: 'smoothstep', animated: false,
-      style: { stroke: '#00ff8833', strokeDasharray: '5 4', strokeWidth: 1.5 },
-    })
+    edges.push(makeEdge(`e-${a.id}-fc`, a.id, 'filecoin', TYPE_COLORS.producer, 'store →'))
   })
   agents.filter(a => a.type === 'consumer').forEach(a => {
-    edges.push({
-      id: `e-fc-${a.id}`, source: 'filecoin', target: a.id,
-      sourceHandle: 'out', targetHandle: 'in',
-      type: 'smoothstep', animated: false,
-      style: { stroke: '#4488ff33', strokeDasharray: '5 4', strokeWidth: 1.5 },
-    })
+    edges.push(makeEdge(`e-fc-${a.id}`, 'filecoin', a.id, TYPE_COLORS.consumer, '← retrieve'))
+    edges.push(makeEdge(`e-${a.id}-fc-pay`, a.id, 'filecoin', '#aa44ff', 'pay →'))
   })
   agents.filter(a => a.type === 'guardian').forEach(a => {
-    edges.push({
-      id: `e-${a.id}-fc`, source: a.id, target: 'filecoin',
-      sourceHandle: 'out', targetHandle: 'bot',
-      type: 'smoothstep', animated: false,
-      style: { stroke: '#ff880033', strokeDasharray: '5 4', strokeWidth: 1.5 },
-    })
+    edges.push(makeEdge(`e-${a.id}-fc`, a.id, 'filecoin', TYPE_COLORS.guardian, 'repin →'))
   })
   return edges
 }
@@ -87,8 +93,22 @@ export default function EconomyPage() {
   const [stats, setStats]       = useState<Stats|null>(null)
   const [epoch, setEpoch]       = useState<number|null>(null)
   const [selected, setSelected] = useState<Node<AgentNodeData>|null>(null)
+  const [walletBalance, setWalletBalance] = useState<string|null>(null)
+  const [countdown, setCountdown] = useState(0)
+  const countdownRef = useRef<any>(null)
+  const autoStopRef = useRef<any>(null)
 
   const nodeTypes = useMemo(() => ({ agentNode: AgentNodeCard }), [])
+
+  useEffect(() => {
+    const addr = '0x4e51EA274b9a6192B2BBB7734b6bE50bC7B4752B'
+    fetch('https://api.calibration.node.glif.io/rpc/v1', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc:'2.0', id:1, method:'Filecoin.EthGetBalance', params:[addr,'latest'] })
+    }).then(r=>r.json()).then(d => {
+      if (d.result) setWalletBalance((parseInt(d.result,16)/1e18).toFixed(4) + ' tFIL')
+    }).catch(()=>{})
+  }, [])
 
   useEffect(() => {
     const iv = setInterval(() => fetch('/api/stats?scope=agents').then(r=>r.json()).then(s => {
@@ -132,8 +152,7 @@ export default function EconomyPage() {
         case 'agent:renew':
           if (n.id === ev.agentId) {
             d.budget = Math.max(0, d.budget - parseFloat(ev.costUsdc ?? '0'))
-            d.pulsing = true
-            d.txCount++
+            d.pulsing = true; d.txCount++
           }
           break
         case 'agent:died':
@@ -148,17 +167,28 @@ export default function EconomyPage() {
       return { ...n, data: d }
     }))
 
-    // Flash edge
     const ev = event as any
     const fromId = ev.from ?? ev.agentId
     if (fromId) {
       const toId = ev.to ?? 'filecoin'
-      const color = event.type==='agent:repin'?'#ff8800':event.type==='agent:pay'?'#4488ff':'#00ff88'
+      const color = event.type==='agent:repin' ? TYPE_COLORS.guardian
+        : event.type==='agent:pay' ? '#aa44ff'
+        : event.type==='agent:store' ? TYPE_COLORS.producer
+        : TYPE_COLORS.consumer
+
       setEdges(eds => eds.map(e => {
         if (!((e.source===fromId&&e.target===toId)||(e.source===toId&&e.target===fromId))) return e
-        const lit = {...e, animated:true, style:{stroke:color,strokeDasharray:'5 4',strokeWidth:2,filter:`drop-shadow(0 0 5px ${color})`}}
+        const lit: Edge = {
+          ...e, animated: true,
+          markerEnd: { type: MarkerType.ArrowClosed, color, width: 20, height: 20 },
+          style: { stroke: color, strokeWidth: 2.5, filter: `drop-shadow(0 0 6px ${color})` },
+        }
         setTimeout(() => setEdges(es => es.map(ee =>
-          ee.id===e.id ? {...ee, animated:false, style:{stroke:color+'33',strokeDasharray:'5 4',strokeWidth:1.5}} : ee
+          ee.id===e.id ? {
+            ...ee, animated: true,
+            markerEnd: { type: MarkerType.ArrowClosed, color, width: 16, height: 16 },
+            style: { stroke: color + '66', strokeWidth: 1.8 },
+          } : ee
         )), 2200)
         return lit
       }))
@@ -173,27 +203,62 @@ export default function EconomyPage() {
     setRunning(true)
     setLoading(false)
     setTimeout(loadAgents, 600)
+
+    // 2-minute countdown
+    setCountdown(120)
+    if (countdownRef.current) clearInterval(countdownRef.current)
+    countdownRef.current = setInterval(() => {
+      setCountdown(c => {
+        if (c <= 1) { clearInterval(countdownRef.current); return 0 }
+        return c - 1
+      })
+    }, 1000)
+
+    // auto-stop after 2 minutes
+    if (autoStopRef.current) clearTimeout(autoStopRef.current)
+    autoStopRef.current = setTimeout(async () => {
+      await fetch('/api/economy/stop', {method:'POST'})
+      setRunning(false)
+      setCountdown(0)
+    }, 120_000)
   }
 
   async function stopEconomy() {
     setLoading(true)
+    if (autoStopRef.current) clearTimeout(autoStopRef.current)
+    if (countdownRef.current) clearInterval(countdownRef.current)
     await fetch('/api/economy/stop', {method:'POST'})
     setRunning(false)
+    setCountdown(0)
     setLoading(false)
   }
 
   return (
     <div className="h-screen flex flex-col bg-[#0f1117] text-white overflow-hidden" style={{fontFamily:'JetBrains Mono, monospace'}}>
 
-      {/* ── Top bar ── */}
+      {/* Top bar */}
       <div className="flex items-center justify-between px-5 h-12 border-b border-[#1e2535] bg-[#0d1018] shrink-0">
         <div className="flex items-center gap-3">
           <span className="text-green-400 font-bold text-sm tracking-tight">StorKeep · Agent Vault</span>
-          <span className="text-[#3a4560] text-xs">Drag &amp; Drop Builder</span>
+          <span className="text-[#3a4560] text-xs">Live Economy · 2-min Demo</span>
         </div>
-        <span className="text-gray-300 text-sm font-semibold tracking-wide">My Agent Network</span>
+        <span className="text-gray-300 text-sm font-semibold tracking-wide">Filecoin Calibration</span>
         <div className="flex items-center gap-4 text-xs">
+          {walletBalance && (
+            <div className="flex items-center gap-1.5 text-yellow-400">
+              <span>💰</span><span>{walletBalance}</span>
+            </div>
+          )}
           {epoch && <span className="text-[#3a4560]">Epoch {epoch.toLocaleString()}</span>}
+
+          {/* Countdown timer */}
+          {running && countdown > 0 && (
+            <div className="flex items-center gap-1.5 text-orange-400 font-bold">
+              <span>⏱</span>
+              <span>{Math.floor(countdown/60)}:{String(countdown%60).padStart(2,'0')}</span>
+            </div>
+          )}
+
           <div className={`flex items-center gap-1.5 ${running?'text-green-400':'text-[#3a4560]'}`}>
             <div className={`w-1.5 h-1.5 rounded-full ${running?'bg-green-400 animate-pulse':'bg-[#2a3040]'}`}/>
             {running?'LIVE':'IDLE'} · Calibration
@@ -201,7 +266,7 @@ export default function EconomyPage() {
           {!running ? (
             <button onClick={startEconomy} disabled={loading}
               className="bg-green-500 hover:bg-green-400 text-black px-4 py-1.5 rounded text-xs font-bold transition-colors disabled:opacity-40 flex items-center gap-1.5">
-              <span>▶</span> Start Economy
+              <span>▶</span> Start (2 min)
             </button>
           ) : (
             <button onClick={stopEconomy} disabled={loading}
@@ -212,31 +277,45 @@ export default function EconomyPage() {
         </div>
       </div>
 
-      {/* ── Body ── */}
+      {/* Legend bar */}
+      <div className="flex items-center gap-6 px-5 h-8 border-b border-[#1e2535] bg-[#0a0c12] text-[10px] shrink-0">
+        <span className="text-[#3a4560] uppercase tracking-widest">Flow:</span>
+        {[
+          { color: '#00ff88', label: 'Producer → Store data' },
+          { color: '#4488ff', label: 'Filecoin → Consumer retrieve' },
+          { color: '#aa44ff', label: 'Consumer → Pay USDFC' },
+          { color: '#ff8800', label: 'Guardian → Repin CID' },
+        ].map(({ color, label }) => (
+          <div key={label} className="flex items-center gap-1.5">
+            <div style={{ width: 24, height: 2, background: color, borderRadius: 1 }} />
+            <span style={{ color }} className="opacity-80">{label}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Body */}
       <div className="flex flex-1 overflow-hidden">
 
-        {/* ── Sidebar ── */}
+        {/* Sidebar */}
         <div className="w-52 shrink-0 flex flex-col bg-[#0d1018] border-r border-[#1e2535] overflow-y-auto">
-
-          {/* Agent types */}
           <div className="p-4 border-b border-[#1e2535]">
             <div className="text-[#3a4560] text-[10px] uppercase tracking-widest mb-3 font-semibold">Agent Types</div>
             {[
-              { type:'producer', label:'Producer Agent', desc:'Stores & earns USDFC', color:'#00ff88', icon:'⬤' },
-              { type:'consumer', label:'Consumer Agent', desc:'Retrieves, pays USDFC', color:'#4488ff', icon:'⬤' },
-              { type:'guardian', label:'Guardian Agent', desc:'Re-pins dark CIDs', color:'#ff8800', icon:'◆' },
+              { type:'producer', label:'Producer', desc:'Stores data, earns USDFC', color:'#00ff88', icon:'⬤' },
+              { type:'consumer', label:'Consumer', desc:'Retrieves, pays USDFC', color:'#4488ff', icon:'⬤' },
+              { type:'guardian', label:'Guardian', desc:'Re-pins dark CIDs', color:'#ff8800', icon:'◆' },
             ].map(a => (
-              <div key={a.type} className="flex items-start gap-2.5 px-2 py-2 rounded-md hover:bg-[#1a2030] cursor-default mb-1 transition-colors">
+              <div key={a.type} style={{ borderLeft: `2px solid ${a.color}33` }}
+                className="flex items-start gap-2.5 px-2 py-2 rounded-r-md hover:bg-[#1a2030] cursor-default mb-1 transition-colors">
                 <span style={{color:a.color}} className="text-xs mt-0.5 shrink-0">{a.icon}</span>
                 <div>
-                  <div className="text-[11px] text-gray-200 font-medium leading-tight">{a.label}</div>
+                  <div className="text-[11px] font-medium leading-tight" style={{color:a.color}}>{a.label}</div>
                   <div className="text-[10px] text-[#3a4560] leading-tight mt-0.5">{a.desc}</div>
                 </div>
               </div>
             ))}
           </div>
 
-          {/* Stats */}
           <div className="p-4 border-b border-[#1e2535]">
             <div className="text-[#3a4560] text-[10px] uppercase tracking-widest mb-3 font-semibold">Stats</div>
             {stats ? (
@@ -250,12 +329,14 @@ export default function EconomyPage() {
             ) : <div className="text-[#2a3040] text-xs">—</div>}
           </div>
 
-          {/* Selected node */}
           {selected && selected.data.type !== 'filecoin' && (
             <div className="p-4">
               <div className="text-[#3a4560] text-[10px] uppercase tracking-widest mb-3 font-semibold">Selected</div>
-              <div className="bg-[#141824] rounded-lg p-3 border border-[#1e2535]">
-                <div className="text-[11px] text-gray-200 font-semibold mb-2">{selected.data.label}</div>
+              <div className="bg-[#141824] rounded-lg p-3 border border-[#1e2535]"
+                style={{ borderLeftColor: TYPE_COLORS[selected.data.type] ?? '#333', borderLeftWidth: 3 }}>
+                <div className="text-[11px] font-semibold mb-2" style={{ color: TYPE_COLORS[selected.data.type] ?? '#ccc' }}>
+                  {selected.data.label}
+                </div>
                 <div className="space-y-1.5 text-[10px] text-[#5a6880]">
                   <div className="flex justify-between"><span>Type</span><span className="text-gray-300">{selected.data.type}</span></div>
                   <div className="flex justify-between"><span>Budget</span><span className="text-gray-300">{selected.data.budget.toFixed(3)} USDFC</span></div>
@@ -272,29 +353,22 @@ export default function EconomyPage() {
           )}
         </div>
 
-        {/* ── Canvas + TX feed ── */}
+        {/* Canvas + TX feed */}
         <div className="flex-1 flex flex-col overflow-hidden">
           <div className="flex-1 relative">
             <ReactFlow
-              nodes={nodes}
-              edges={edges}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
-              onConnect={onConnect}
-              nodeTypes={nodeTypes}
+              nodes={nodes} edges={edges}
+              onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
+              onConnect={onConnect} nodeTypes={nodeTypes}
               onNodeClick={(_, n) => setSelected(n as Node<AgentNodeData>)}
-              fitView
-              fitViewOptions={{ padding: 0.18 }}
+              fitView fitViewOptions={{ padding: 0.18 }}
               defaultEdgeOptions={{ type:'smoothstep' }}
               proOptions={{ hideAttribution: true }}
             >
               <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="#1e2535" />
               <Controls style={{background:'#0d1018',border:'1px solid #1e2535',borderRadius:8}} />
               <MiniMap
-                nodeColor={(n:any) => {
-                  const t = n.data?.type
-                  return {producer:'#00ff8855',consumer:'#4488ff55',guardian:'#ff880055',filecoin:'#0090ff55'}[t as string]??'#33404f'
-                }}
+                nodeColor={(n:any) => TYPE_COLORS[n.data?.type as string] + '55' ?? '#33404f'}
                 style={{background:'#0d1018',border:'1px solid #1e2535',borderRadius:8}}
               />
             </ReactFlow>
@@ -303,13 +377,12 @@ export default function EconomyPage() {
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="text-center bg-[#0d1018]/90 px-10 py-7 rounded-xl border border-[#1e2535] backdrop-blur-sm">
                   <div className="text-gray-400 text-sm mb-1 font-medium">Agent economy not running</div>
-                  <div className="text-[#3a4560] text-xs">Click ▶ Start Economy to spawn agents</div>
+                  <div className="text-[#3a4560] text-xs">Click ▶ Start (2 min) to spawn agents</div>
                 </div>
               </div>
             )}
           </div>
 
-          {/* TX feed */}
           <div className="h-28 border-t border-[#1e2535] bg-[#0d1018] shrink-0">
             <div className="text-[#3a4560] text-[10px] uppercase tracking-widest px-4 pt-2.5 pb-1 font-semibold">TX Feed</div>
             <TxFeed />

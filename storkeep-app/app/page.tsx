@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { HomeStats } from '@/components/HomeStats'
 
 async function getStats() {
   try {
@@ -39,18 +40,10 @@ export default async function Home() {
         </div>
       </section>
 
-      <section className="border-t border-b border-gray-800 py-12">
-        <div className="max-w-4xl mx-auto px-6 grid grid-cols-2 gap-8">
-          <div>
-            <div className="text-4xl font-bold text-green-400">{stats.totalRenewals}</div>
-            <div className="text-gray-500 mt-1">deals renewed</div>
-          </div>
-          <div>
-            <div className="text-4xl font-bold text-green-400">{stats.activeAutopilots}</div>
-            <div className="text-gray-500 mt-1">on autopilot</div>
-          </div>
-        </div>
-      </section>
+      <HomeStats
+        initialRenewals={stats.totalRenewals ?? 0}
+        initialAutopilots={stats.activeAutopilots ?? 0}
+      />
 
       <section className="max-w-4xl mx-auto px-6 py-16">
         <h2 className="text-2xl font-bold mb-10">How it works</h2>
